@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { products, categories, newArrivals } from '../data/products';
 
@@ -80,14 +80,19 @@ function ImgPlaceholder({ category }) {
 }
 
 /** Single product card */
-function ProductCard({ product }) {
+function ProductCard({ product, location }) {
   const hasImg = product.img1 !== null;
 
   return (
-    <motion.div
-      variants={fadeUp}
-      className="product-card group relative bg-[#161616] border border-white/5 hover-glow transition-all duration-300 p-3"
+    <Link
+      to={`/products/${product.slug}`}
+      state={{ backgroundLocation: location }}
+      className="block"
     >
+      <motion.div
+        variants={fadeUp}
+        className="product-card group relative bg-[#161616] border border-white/5 hover-glow transition-all duration-300 p-3"
+      >
       {/* Badges */}
       {product.sale && (
         <div className="absolute top-4 left-0 z-20 bg-[#ff5500] text-black px-4 py-1 font-headline text-sm clip-parallelogram">
@@ -120,11 +125,11 @@ function ProductCard({ product }) {
         )}
 
         {/* ORDER NOW button slides up on hover */}
-        <div className="absolute inset-0 flex items-end justify-center pb-6">
-          <button className="order-btn clip-parallelogram bg-white text-black px-8 py-2 font-headline text-xl hover:bg-[#ff5500] hover:text-white transition-colors">
-            ORDER NOW
-          </button>
-        </div>
+          <div className="absolute inset-0 flex items-end justify-center pb-6">
+            <span className="order-btn clip-parallelogram bg-white text-black px-8 py-2 font-headline text-xl hover:bg-[#ff5500] hover:text-white transition-colors">
+              ORDER NOW
+            </span>
+          </div>
       </div>
 
       {/* Info */}
@@ -160,13 +165,15 @@ function ProductCard({ product }) {
           )}
         </div>
       </div>
-    </motion.div>
+      </motion.div>
+    </Link>
   );
 }
 
 /* ─── Main Page ──────────────────────────────────────────────── */
 
 export default function LandingPage() {
+  const location = useLocation();
   /* Typewriter */
   const [twText,    setTwText]    = useState('');
   const [twWordIdx, setTwWordIdx] = useState(0);
@@ -439,7 +446,7 @@ export default function LandingPage() {
             animate="show"
           >
             {filtered.map((product) => (
-              <ProductCard key={product.id} product={product} />
+              <ProductCard key={product.id} product={product} location={location} />
             ))}
           </motion.div>
 

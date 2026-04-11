@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&amp;family=DM+Sans:wght@400;500;700&amp;family=Space+Mono:ital,wght@0,400;0,700;1,400&amp;family=Space+Grotesk:wght@300..700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-primary": "#5c1900",
+                        "surface-tint": "#ffb59c",
+                        "on-tertiary": "#581e00",
+                        "on-error": "#690005",
+                        "background": "#080808",
+                        "surface-container-high": "#161616",
+                        "on-tertiary-fixed": "#360f00",
+                        "secondary-fixed-dim": "#c8c6c5",
+                        "on-secondary-fixed": "#1b1c1c",
+                        "on-primary-fixed-variant": "#822700",
+                        "on-tertiary-fixed-variant": "#7d2d00",
+                        "surface-container-low": "#111111",
+                        "surface-container-lowest": "#0e0e0e",
+                        "on-background": "#e5e2e1",
+                        "tertiary-fixed": "#ffdbcd",
+                        "inverse-primary": "#aa3600",
+                        "surface-variant": "#353534",
+                        "error": "#ffb4ab",
+                        "tertiary": "#ffb596",
+                        "inverse-surface": "#e5e2e1",
+                        "on-error-container": "#ffdad6",
+                        "tertiary-container": "#ec6926",
+                        "on-surface-variant": "#e5beb2",
+                        "on-secondary": "#303030",
+                        "on-surface": "#e5e2e1",
+                        "primary-fixed-dim": "#ffb59c",
+                        "on-secondary-fixed-variant": "#474746",
+                        "secondary": "#c8c6c5",
+                        "tertiary-fixed-dim": "#ffb596",
+                        "surface-container": "#201f1f",
+                        "surface-dim": "#131313",
+                        "secondary-fixed": "#e4e2e1",
+                        "surface": "#131313",
+                        "on-primary-fixed": "#390c00",
+                        "on-primary-container": "#511500",
+                        "primary-container": "#ff5708",
+                        "surface-container-highest": "#353534",
+                        "inverse-on-surface": "#313030",
+                        "outline": "#ac897e",
+                        "on-secondary-container": "#b6b5b4",
+                        "primary": "#ff5500",
+                        "surface-bright": "#3a3939",
+                        "error-container": "#93000a",
+                        "secondary-container": "#474746",
+                        "outline-variant": "#5c4037",
+                        "primary-fixed": "#ffdbcf",
+                        "on-tertiary-container": "#4d1900"
+                    },
+                    fontFamily: {
+                        headline: ["Bebas Neue", "sans-serif"],
+                        body: ["DM Sans", "sans-serif"],
+                        technical: ["Space Mono", "monospace"],
+                        label: ["Space Grotesk", "sans-serif"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .noise-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.03;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+        .parallelogram-btn {
+            clip-path: polygon(10% 0%, 100% 0%, 90% 100%, 0% 100%);
+        }
+        .signature-divider {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #ff5500, transparent);
+        }
+        .glow-hover:hover {
+            box-shadow: 0 0 20px rgba(255, 85, 0, 0.3);
+        }
+        @keyframes marquee {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+        .animate-marquee {
+            display: inline-flex;
+            white-space: nowrap;
+            animation: marquee 30s linear infinite;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body selection:bg-primary selection:text-white">
+<div class="noise-overlay"></div>
+<!-- Announcement Bar -->
+<div class="fixed top-0 left-0 w-full h-[36px] bg-[#ff5500] z-[110] flex items-center overflow-hidden border-b border-black/10">
+<div class="animate-marquee flex items-center gap-4">
+<span class="font-technical text-[0.65rem] text-black font-bold uppercase tracking-[0.15em]">
+            FREE DELIVERY OVER 1,000৳ IN DHAKA ◆ PREMIUM QUALITY 3D PRINTS ◆ CUSTOM ORDERS WELCOME ◆ SAME-WEEK TURNAROUND ◆ FREE DELIVERY OVER 1,000৳ IN DHAKA ◆ PREMIUM QUALITY 3D PRINTS ◆ CUSTOM ORDERS WELCOME ◆ SAME-WEEK TURNAROUND
+        </span>
+<span class="font-technical text-[0.65rem] text-black font-bold uppercase tracking-[0.15em]">
+            FREE DELIVERY OVER 1,000৳ IN DHAKA ◆ PREMIUM QUALITY 3D PRINTS ◆ CUSTOM ORDERS WELCOME ◆ SAME-WEEK TURNAROUND ◆ FREE DELIVERY OVER 1,000৳ IN DHAKA ◆ PREMIUM QUALITY 3D PRINTS ◆ CUSTOM ORDERS WELCOME ◆ SAME-WEEK TURNAROUND
+        </span>
+</div>
+</div>
+<!-- TopNavBar (Top adjusted for announcement bar) -->
+<nav class="fixed top-[36px] w-full z-[100] bg-stone-950/80 backdrop-blur-md border-b border-white/5 flex justify-between items-center px-8 h-20">
+<a class="font-black text-2xl tracking-tighter text-white uppercase italic" href="{{DATA:SCREEN:SCREEN_11}}">Layercade</a>
+<div class="hidden md:flex gap-8 items-center">
+<a class="font-medium tracking-wide text-stone-400 hover:text-white transition-colors duration-300" href="{{DATA:SCREEN:SCREEN_11}}">Collections</a>
+<a class="font-medium tracking-wide text-stone-400 hover:text-white transition-colors duration-300" href="{{DATA:SCREEN:SCREEN_11}}">Best Sellers</a>
+<a class="font-medium tracking-wide text-stone-400 hover:text-white transition-colors duration-300" href="{{DATA:SCREEN:SCREEN_13}}">Process</a>
+<a class="font-medium tracking-wide text-stone-400 hover:text-white transition-colors duration-300" href="{{DATA:SCREEN:SCREEN_9}}">Materials</a>
+<a class="font-medium tracking-wide text-stone-400 hover:text-white transition-colors duration-300" href="{{DATA:SCREEN:SCREEN_12}}">Gallery</a>
+</div>
+<a class="bg-primary text-white font-headline px-6 py-2 parallelogram-btn hover:scale-[1.02] transition-transform hover:shadow-[0_0_20px_rgba(255,85,0,0.3)] active:scale-95 duration-100 flex items-center justify-center" href="{{DATA:SCREEN:SCREEN_5}}">
+            Get a Quote
+        </a>
+</nav>
+<main class="pt-44 pb-20 px-8 max-w-7xl mx-auto">
+<!-- Section Header -->
+<header class="mb-16">
+<h1 class="font-headline text-6xl md:text-8xl tracking-tight text-white mb-2">REQUEST A QUOTE</h1>
+<div class="signature-divider w-full"></div>
+</header>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
+<!-- Left Column: Contact & Info -->
+<section class="space-y-12">
+<div class="space-y-6">
+<h2 class="font-headline text-3xl text-primary">PRECISION ENGINEERING ON DEMAND</h2>
+<p class="text-stone-400 text-lg max-w-md leading-relaxed">
+                        Our additive manufacturing facility utilizes high-grade aerospace materials and industrial-scale precision. Submit your technical requirements for a comprehensive feasibility report and lead-time estimate.
+                    </p>
+</div>
+<div class="grid gap-8">
+<div class="flex items-start gap-4">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">mail</span>
+<div>
+<p class="font-technical text-xs uppercase tracking-widest text-stone-500 mb-1">Direct Inquiries</p>
+<p class="font-body text-xl text-white">hello@layercade.com</p>
+</div>
+</div>
+<div class="flex items-start gap-4">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">location_on</span>
+<div>
+<p class="font-technical text-xs uppercase tracking-widest text-stone-500 mb-1">Manufacturing Hub</p>
+<p class="font-body text-xl text-white">Dhaka, Bangladesh</p>
+</div>
+</div>
+<div class="flex items-start gap-4">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">verified</span>
+<div>
+<p class="font-technical text-xs uppercase tracking-widest text-stone-500 mb-1">Our Guarantee</p>
+<p class="font-body text-stone-300">Tolerance accuracy within 50 microns. Grade-5 Titanium and Industrial Polymers available.</p>
+</div>
+</div>
+</div>
+<div class="relative h-64 w-full bg-surface-container-high overflow-hidden group">
+<img alt="Industrial 3D printer closeup" class="w-full h-full object-cover grayscale opacity-40 group-hover:grayscale-0 group-hover:opacity-60 transition-all duration-700" data-alt="Close-up macro of an industrial metal 3D printer nozzle emitting a glowing orange laser beam onto a dark titanium plate" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDdisla_7ODHyxA5-dKLMDISZFGeEcsQlFuseU6aUV-3sI6JmUUStTAdSaEozkdkOFmeDBD58xJidGJxSIopEuuoPoOPC_HHFvSq07SwIeIwVJ4zwCXVki-2No2YCZX8hxauElawDyi7Ubfhe1RfBdnKBgbRBJhs_5ER4L0RY_VK_R8CysMVBngDXFcKL6Mx6ljsysZ2AQHSyOVnSjgUCzWkgaGry4Y5b_XVrnRdvBUe72i6UKgFrHXKgweY6SSQdOamjY_mjF_-DM"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background to-transparent"></div>
+<div class="absolute bottom-4 left-4 font-technical text-[10px] text-primary bg-stone-950/80 px-2 py-1">
+                        UNIT_ID: LC-049 // SYSTEM_ACTIVE
+                    </div>
+</div>
+</section>
+<!-- Right Column: Industrial Form -->
+<section class="bg-surface-container-high p-8 md:p-12 relative border-l-4 border-primary">
+<form class="space-y-8">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+<!-- Full Name -->
+<div class="space-y-2">
+<label class="font-technical text-xs text-stone-400 uppercase tracking-widest">Full Name</label>
+<input class="w-full bg-surface-container-low border-b border-stone-800 text-white p-3 focus:outline-none focus:border-primary transition-colors placeholder:text-stone-700 font-body" placeholder="John Doe" type="text"/>
+</div>
+<!-- Email -->
+<div class="space-y-2">
+<label class="font-technical text-xs text-stone-400 uppercase tracking-widest">Email Address</label>
+<input class="w-full bg-surface-container-low border-b border-stone-800 text-white p-3 focus:outline-none focus:border-primary transition-colors placeholder:text-stone-700 font-body" placeholder="j.doe@enterprise.com" type="email"/>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+<!-- Phone -->
+<div class="space-y-2">
+<label class="font-technical text-xs text-stone-400 uppercase tracking-widest">Phone Number</label>
+<input class="w-full bg-surface-container-low border-b border-stone-800 text-white p-3 focus:outline-none focus:border-primary transition-colors placeholder:text-stone-700 font-body" placeholder="+880 1XXX-XXXXXX" type="tel"/>
+</div>
+<!-- Product Interest -->
+<div class="space-y-2">
+<label class="font-technical text-xs text-stone-400 uppercase tracking-widest">Product Interest</label>
+<select class="w-full bg-surface-container-low border-b border-stone-800 text-white p-3 focus:outline-none focus:border-primary transition-colors font-body appearance-none cursor-pointer">
+<option>Custom Aerospace Components</option>
+<option>Industrial Prototyping</option>
+<option>Medical Grade Implants</option>
+<option>Architectural Models</option>
+</select>
+</div>
+</div>
+<!-- File Upload Placeholder -->
+<div class="space-y-2">
+<label class="font-technical text-xs text-stone-400 uppercase tracking-widest">CAD/Technical Drawings (.STL, .STEP, .OBJ)</label>
+<div class="border-2 border-dashed border-stone-800 bg-surface-container-low p-8 text-center hover:border-primary/50 transition-colors group cursor-pointer">
+<span class="material-symbols-outlined text-4xl text-stone-600 group-hover:text-primary transition-colors mb-2">upload_file</span>
+<p class="text-stone-500 font-body">Drag and drop technical files or <span class="text-primary">browse</span></p>
+<p class="text-stone-700 font-technical text-[10px] mt-2">MAX FILE SIZE: 50MB</p>
+</div>
+</div>
+<!-- Message -->
+<div class="space-y-2">
+<label class="font-technical text-xs text-stone-400 uppercase tracking-widest">Project Description</label>
+<textarea class="w-full bg-surface-container-low border-b border-stone-800 text-white p-3 focus:outline-none focus:border-primary transition-colors placeholder:text-stone-700 font-body resize-none" placeholder="Detailed specifications, quantity, and material preferences..." rows="4"></textarea>
+</div>
+<!-- Submit Button -->
+<button class="w-full bg-primary text-white font-headline text-2xl py-5 parallelogram-btn glow-hover hover:scale-[1.01] active:scale-95 transition-all duration-200" type="submit">
+                        SEND REQUEST →
+                    </button>
+<!-- Hidden Success Message (Toggleable) -->
+<div class="hidden bg-emerald-500/10 border-l-4 border-emerald-500 p-4">
+<p class="text-emerald-400 font-technical text-sm flex items-center gap-2">
+<span class="material-symbols-outlined text-lg">check_circle</span>
+                            ✓ Request received! We'll be in touch within 24 hours.
+                        </p>
+</div>
+</form>
+</section>
+</div>
+</main>
+<!-- WhatsApp Floating Button -->
+<a class="fixed bottom-8 right-8 z-[120] group flex items-center" href="https://wa.me/8801XXXXXXXXX?text=Hi%2C%20I%27m%20interested%20in%20ordering%20from%20Layercade%21">
+<div class="absolute right-[64px] bg-stone-900 text-white font-technical text-[0.6rem] py-1.5 px-3 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap tracking-wider border border-stone-800 shadow-xl">
+        Order via WhatsApp
+    </div>
+<div class="w-[54px] h-[54px] bg-[#25D366] rounded-full flex items-center justify-center shadow-[0_4px_20px_rgba(37,211,102,0.4)] transition-transform duration-300 group-hover:scale-110">
+<svg fill="white" height="30" viewbox="0 0 24 24" width="30" xmlns="http://www.w3.org/2000/svg">
+<path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"></path>
+</svg>
+</div>
+</a>
+<!-- Footer -->
+<footer class="bg-stone-950 border-t border-transparent bg-gradient-to-r from-transparent via-orange-600 to-transparent pt-px mt-20">
+<div class="max-w-7xl mx-auto px-12 py-16 grid grid-cols-1 md:grid-cols-4 gap-12">
+<div class="space-y-4">
+<div class="text-xl font-bold text-white uppercase">Layercade</div>
+<p class="font-body text-sm text-stone-500 leading-relaxed">Precision additive manufacturing for the next generation of industrial design.</p>
+</div>
+<div class="flex flex-col gap-3">
+<h4 class="font-headline text-lg text-white mb-2">Navigation</h4>
+<a class="font-body text-sm text-stone-500 hover:text-orange-400 hover:translate-x-1 transition-transform duration-200" href="{{DATA:SCREEN:SCREEN_11}}">Collections</a>
+<a class="font-body text-sm text-stone-500 hover:text-orange-400 hover:translate-x-1 transition-transform duration-200" href="{{DATA:SCREEN:SCREEN_13}}">Process</a>
+<a class="font-body text-sm text-stone-500 hover:text-orange-400 hover:translate-x-1 transition-transform duration-200" href="{{DATA:SCREEN:SCREEN_9}}">Materials</a>
+</div>
+<div class="flex flex-col gap-3">
+<h4 class="font-headline text-lg text-white mb-2">Company</h4>
+<a class="font-body text-sm text-stone-500 hover:text-orange-400 hover:translate-x-1 transition-transform duration-200" href="{{DATA:SCREEN:SCREEN_12}}">Gallery</a>
+<a class="font-body text-sm text-stone-500 hover:text-orange-400 hover:translate-x-1 transition-transform duration-200" href="#">Contact</a>
+<a class="font-body text-sm text-stone-500 hover:text-orange-400 hover:translate-x-1 transition-transform duration-200" href="#">Privacy Policy</a>
+</div>
+<div class="space-y-6">
+<h4 class="font-headline text-lg text-white">Connect</h4>
+<div class="flex gap-4">
+<span class="material-symbols-outlined text-orange-600 cursor-pointer hover:scale-110 transition-transform" data-icon="mail">mail</span>
+<span class="material-symbols-outlined text-orange-600 cursor-pointer hover:scale-110 transition-transform" data-icon="share">share</span>
+</div>
+<p class="font-technical text-xs text-stone-500 mt-4">© 2024 Layercade. Precision. Layer by Layer.</p>
+</div>
+</div>
+</footer>
+</body></html>

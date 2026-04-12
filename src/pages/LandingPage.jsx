@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { products, categories, newArrivals } from '../data/products';
+import { FloatingPaths } from '@/components/ui/background-paths';
 
 /* ─── Constants ──────────────────────────────────────────────── */
 
@@ -213,25 +214,23 @@ export default function LandingPage() {
     <main>
       {/* ── 01 HERO ──────────────────────────────────────────── */}
       <section className="relative min-h-screen flex flex-col items-center justify-center orange-grid overflow-hidden pt-[calc(36px+80px)]">
+        {/* Animated background paths */}
+        <div className="absolute inset-0 text-[#ff5500]">
+          <FloatingPaths position={1} />
+          <FloatingPaths position={-1} />
+        </div>
+
         {/* gradient fade to bg */}
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#080808]/60 to-[#080808] pointer-events-none" />
 
-        {/* Glow orb behind hero image */}
-        <div className="relative w-64 h-64 md:w-96 md:h-96 z-10 opacity-90">
-          <div className="absolute inset-0 bg-[#ff5500] blur-[120px] opacity-20 animate-pulse" />
-          {/* Placeholder orb — replace with real hero image when available */}
-          <div
-            className="w-full h-full rounded-full bg-gradient-to-br from-stone-800 to-stone-950
-                        border border-white/5 flex items-center justify-center
-                        drop-shadow-[0_0_30px_rgba(255,85,0,0.4)]"
-          >
-            <span
-              className="material-symbols-outlined text-[#ff5500]/40"
-              style={{ fontSize: 120 }}
-            >
-              view_in_ar
-            </span>
-          </div>
+        {/* Logo with glow */}
+        <div className="relative w-64 h-64 md:w-96 md:h-96 z-10">
+          <div className="absolute inset-0 bg-[#ff5500] blur-[120px] opacity-25 animate-pulse" />
+          <img
+            src="/logo.png"
+            alt="Layercade"
+            className="relative w-full h-full object-contain drop-shadow-[0_0_40px_rgba(255,85,0,0.5)]"
+          />
         </div>
 
         {/* Headline + typewriter */}

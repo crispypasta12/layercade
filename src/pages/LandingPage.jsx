@@ -3,6 +3,9 @@ import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { products, categories, newArrivals } from '../data/products';
 import { FloatingPaths } from '@/components/ui/background-paths';
+import { InteractiveRobotSpline } from '@/components/ui/interactive-3d-robot';
+
+const ROBOT_SCENE_URL = 'https://prod.spline.design/PyzDhpQ9E5f1E3MT/scene.splinecode';
 
 /* ─── Constants ──────────────────────────────────────────────── */
 
@@ -560,6 +563,21 @@ export default function LandingPage() {
               </motion.div>
             ))}
           </motion.div>
+        </div>
+      </section>
+
+      {/* ── 06.5 INTERACTIVE SHOWCASE ────────────────────────── */}
+      <section className="relative w-full h-screen overflow-hidden bg-[#080808]">
+        <InteractiveRobotSpline
+          scene={ROBOT_SCENE_URL}
+          className="absolute inset-0 w-full h-full z-0"
+        />
+        <div className="absolute top-0 inset-x-0 h-24 bg-gradient-to-b from-[#111111] to-transparent pointer-events-none z-10" />
+        <div className="absolute bottom-0 inset-x-0 h-32 bg-gradient-to-t from-[#080808] to-transparent pointer-events-none z-10" />
+        <div className="absolute bottom-10 left-8 z-20 pointer-events-none">
+          <span className="font-technical text-[10px] text-stone-600 uppercase tracking-widest">
+            // INTERACTIVE — DRAG TO EXPLORE
+          </span>
         </div>
       </section>
 

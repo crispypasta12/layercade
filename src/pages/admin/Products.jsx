@@ -1,44 +1,27 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getPrimaryProductImage, parseProductImages } from '../../lib/productImages';
 import { supabase } from '../../lib/supabase';
 import AdminNavbar from '../../components/admin/AdminNavbar';
 import ProductFormModal from '../../components/admin/ProductFormModal';
 import DeleteConfirmModal from '../../components/admin/DeleteConfirmModal';
 import Toast from '../../components/Toast';
 
-function parseProductImages(imageValue, imagesValue) {
-  if (Array.isArray(imagesValue)) {
-    return imagesValue.filter((value) => typeof value === 'string' && value.trim());
-  }
-
-  if (typeof imageValue === 'string') {
-    const trimmed = imageValue.trim();
-    if (!trimmed) return [];
-
-    if (trimmed.startsWith('[')) {
-      try {
-        const parsed = JSON.parse(trimmed);
-        if (Array.isArray(parsed)) {
-          return parsed.filter((value) => typeof value === 'string' && value.trim());
-        }
-      } catch {
-        // Fall back to plain string if stored value is not valid JSON.
-      }
-    }
-
-    return [trimmed];
-  }
-
-  return [];
-}
-
 /* ─── Constants ──────────────────────────────────────────────────── */
 
 const CATEGORIES = [
   'All Categories',
   'Gaming Accessories',
-  'Collectibles',
+  'Headphone Stands',
+  'Busts',
   'Masks',
+  'Diorama',
+  'Keycap',
+  'Flower Vases',
+  'Desk Accessories',
+  'Pegboard Accessories',
+  'Room Decor',
+  'Collectibles',
   'Headphone Gear',
   'Sculptures',
   'Custom',
@@ -135,7 +118,7 @@ export default function AdminProducts() {
         return {
           ...product,
           images,
-          image: images[0] ?? '',
+          image: getPrimaryProductImage(product.image, product.images) ?? '',
         };
       }),
     );

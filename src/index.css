@@ -112,8 +112,7 @@ body {
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 
 /* ─── Custom Cursor ─────────────────────────────────────── */
-body { cursor: none; }
-a, button { cursor: none; }
+/* (removed — using native cursor) */
 
 /* ─── Material Symbols ──────────────────────────────────── */
 .material-symbols-outlined {
@@ -141,6 +140,11 @@ details summary::-webkit-details-marker { display: none; }
 /* ─── No scrollbar ──────────────────────────────────────── */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ─── Horizontal thin scrollbar (categories row) ────────── */
+.h-scroll::-webkit-scrollbar        { height: 2px; }
+.h-scroll::-webkit-scrollbar-track  { background: rgba(255,255,255,0.04); }
+.h-scroll::-webkit-scrollbar-thumb  { background: #ff5500; }
 
 /* ─── Masonry (Gallery) ─────────────────────────────────── */
 .masonry-grid {

@@ -3,33 +3,8 @@
  * All functions are async and return plain objects that match the
  * shape components expect (img1, img2, slug, sale, etc.)
  */
+import { parseProductImages } from '../lib/productImages';
 import { supabase } from '../lib/supabase';
-
-function parseProductImages(imageValue, imagesValue) {
-  if (Array.isArray(imagesValue)) {
-    return imagesValue.filter((value) => typeof value === 'string' && value.trim());
-  }
-
-  if (typeof imageValue === 'string') {
-    const trimmed = imageValue.trim();
-    if (!trimmed) return [];
-
-    if (trimmed.startsWith('[')) {
-      try {
-        const parsed = JSON.parse(trimmed);
-        if (Array.isArray(parsed)) {
-          return parsed.filter((value) => typeof value === 'string' && value.trim());
-        }
-      } catch {
-        // Fall through to single-image behavior if the string is not valid JSON.
-      }
-    }
-
-    return [trimmed];
-  }
-
-  return [];
-}
 
 // ─── Shape adapter ───────────────────────────────────────────────────────────
 // Converts a raw Supabase row into the shape used by existing components.
@@ -117,6 +92,60 @@ export async function getNewArrivals() {
     return [];
   }
   return data.map(toProduct);
+}
+
+/**
+ * Up to 3 related products: same category first, then others.
+ * Fetches a small batch and sorts client-side — avoids loading all products.
+ */
+export async function getRelatedProducts(category, excludeSlug) {
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .neq('slug', excludeSlug)
+    .order('sort_order', { ascending: true })
+    .limit(10);
+
+  if (error) {
+    console.error('[products] getRelatedProducts error:', error.message);
+    return [];
+  }
+
+  const all = (data ?? []).map(toProduct);
+  const sameCategory = all.filter((p) => p.category === category);
+  const others = all.filter((p) => p.category !== category);
+  return [...sameCategory, ...others].slice(0, 3);
+}
+
+/**
+ * Paginated product fetch, optionally filtered by category.
+ * Returns { products, total } where total is the full unsliced count.
+ */
+export async function fetchProductsByCategory({ category = null, page = 1, perPage = 12 } = {}) {
+  const from = (page - 1) * perPage;
+  const to   = from + perPage - 1;
+
+  let query = supabase
+    .from('products')
+    .select('*', { count: 'exact' })
+    .order('sort_order', { ascending: true })
+    .range(from, to);
+
+  if (category) {
+    query = query.eq('category', category);
+  }
+
+  const { data, error, count } = await query;
+
+  if (error) {
+    console.error('[products] fetchProductsByCategory error:', error.message);
+    return { products: [], total: 0 };
+  }
+
+  return {
+    products: (data ?? []).map(toProduct),
+    total: count ?? 0,
+  };
 }
 
 /** Single product by slug, or null if not found */

@@ -31,7 +31,7 @@ export const useCartStore = create(
                 name: product.name,
                 price: product.price,
                 quantity: nextQuantity,
-                image: product.img1 ?? null,
+                image: product.images?.[0] ?? product.img1 ?? null,
                 slug: product.slug,
               },
             ],
@@ -56,9 +56,6 @@ export const useCartStore = create(
       },
 
       clearCart: () => set({ items: [] }),
-
-      totalItems: () => get().items.reduce((sum, i) => sum + i.quantity, 0),
-      totalAmount: () => get().items.reduce((sum, i) => sum + i.price * i.quantity, 0),
     }),
     {
       name: 'layercade-cart',

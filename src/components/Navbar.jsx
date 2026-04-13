@@ -5,7 +5,7 @@ import CartDrawer from './CartDrawer';
 import { supabase } from '../lib/supabase';
 
 const navLinks = [
-  { label: 'Collections', to: '/#collections' },
+  { label: 'Shop',         to: '/shop' },
   { label: 'Best Sellers', to: '/#best-sellers' },
   { label: 'Process',      to: '/process' },
   { label: 'Materials',    to: '/materials' },

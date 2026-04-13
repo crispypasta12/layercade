@@ -4,7 +4,8 @@ import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { useCartStore } from '../store/cartStore';
 
-const DELIVERY_FEE = 60;
+const DHAKA_FEE = 60;
+const OUTSIDE_FEE = 120;
 
 const DISTRICTS = [
   'Dhaka',
@@ -115,15 +116,16 @@ export default function Checkout() {
     if (items.length === 0) {
       navigate('/', { replace: true });
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const subtotal   = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
-  const grandTotal = subtotal + DELIVERY_FEE;
+  }, [items.length, navigate]);
 
   const [form,        setForm]        = useState(INITIAL_FORM);
   const [errors,      setErrors]      = useState({});
   const [loading,     setLoading]     = useState(false);
   const [submitError, setSubmitError] = useState(null);
+
+  const subtotal    = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  const deliveryFee = form.district && form.district !== 'Dhaka' ? OUTSIDE_FEE : DHAKA_FEE;
+  const grandTotal  = subtotal + deliveryFee;
 
   const setField = (key) => (e) => setForm((prev) => ({ ...prev, [key]: e.target.value }));
 
@@ -171,7 +173,7 @@ export default function Checkout() {
         district:       form.district,
         items:          items,
         total_amount:   grandTotal,
-        delivery_fee:   DELIVERY_FEE,
+        delivery_fee:   deliveryFee,
         payment_method: 'cod',
         notes:          form.notes.trim() || null,
       }])
@@ -281,7 +283,7 @@ export default function Checkout() {
             </div>
             <div className="flex justify-between font-body text-stone-400 text-sm">
               <span>Delivery Fee</span>
-              <span className="font-technical">{DELIVERY_FEE}৳</span>
+              <span className="font-technical">{deliveryFee}৳</span>
             </div>
             <div className="signature-divider opacity-30" />
             <div className="flex justify-between items-baseline">
@@ -317,7 +319,7 @@ export default function Checkout() {
               info
             </span>
             <p className="font-technical text-[10px] text-stone-600 uppercase tracking-wide leading-relaxed">
-              Inside Dhaka: flat ৳60. Outside Dhaka: ৳120 (adjusted at delivery).
+              Inside Dhaka: flat ৳60. Outside Dhaka: ৳120.
               We'll call before delivery to confirm.
             </p>
           </div>

@@ -3,20 +3,12 @@ import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { getFeaturedProducts, getNewArrivals } from '../data/products';
 import { FloatingPaths } from '@/components/ui/background-paths';
-import { useCartStore } from '../store/cartStore';
+import ProductCard, { fadeUp } from '../components/ProductCard';
+import { CATEGORIES } from '../lib/categories';
 
 /* ─── Constants ──────────────────────────────────────────────── */
 const TW_WORDS = ['PLA', 'PETG', 'TPU', 'RESIN', 'ASA', 'FLEX'];
 
-const COLLECTION_CARDS = [
-  { num: '01', count: '14 PRODUCTS', title: 'GAMING ACCESSORIES',  sub: 'Controllers, stands & PC mods',    span: 2, filter: 'Gaming' },
-  { num: '02', count: '9 PRODUCTS',  title: 'HEADPHONE GEAR',      sub: 'Stands & wall mounts',             span: 1, filter: 'Headphone Gear' },
-  { num: '03', count: '12 PRODUCTS', title: 'COLLECTIBLE BUSTS',   sub: 'Icons & legends',                  span: 1, filter: 'Busts' },
-  { num: '04', count: '8 PRODUCTS',  title: 'MASKS & WEARABLES',   sub: 'Cosplay ready',                    span: 1, filter: 'Masks' },
-  { num: '05', count: '10 PRODUCTS', title: 'SCULPTURES',          sub: 'Artisan figurines',                span: 1, filter: 'Decor' },
-  { num: '06', count: '7 PRODUCTS',  title: 'DESK & HOME DECOR',   sub: 'Minimalist & futuristic',          span: 1, filter: 'Decor' },
-  { num: '07', count: '6 PRODUCTS',  title: 'COSPLAY & PROPS',     sub: 'Highly detailed replicas',         span: 1, filter: 'Cosplay', cosplay: true },
-];
 
 const REVIEWS = [
   {
@@ -57,145 +49,15 @@ const FAQ_ITEMS = [
 
 /* ─── Animation Variants ─────────────────────────────────────── */
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 40 },
-  show:   { opacity: 1, y: 0 },
-};
-
 const stagger = {
   hidden: {},
   show:   { transition: { staggerChildren: 0.08 } },
 };
 
-/* ─── Sub-components ─────────────────────────────────────────── */
-
-/** Dark placeholder shown when a product has no image */
-function ImgPlaceholder({ category }) {
-  return (
-    <div className="w-full h-full bg-stone-900 flex items-center justify-center">
-      <span className="font-technical text-stone-700 text-[10px] uppercase tracking-widest">
-        {category}
-      </span>
-    </div>
-  );
-}
-
-/** Single product card */
-function ProductCard({ product, location }) {
-  const hasImg = product.img1 !== null;
-  const addItem  = useCartStore((state) => state.addItem);
-  const openCart = useCartStore((state) => state.openCart);
-
-  const handleAddToCart = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    addItem(product);
-    openCart();
-  };
-
-  return (
-    <motion.div
-      variants={fadeUp}
-      className="product-card group relative bg-[#161616] border border-white/5 hover-glow transition-all duration-300 p-3 flex flex-col"
-    >
-      {/* Badges */}
-      {product.sale && !product.isNew && (
-        <div className="absolute top-4 left-0 z-20 bg-[#ff5500] text-black px-4 py-1 font-headline text-sm clip-parallelogram">
-          SALE
-        </div>
-      )}
-      {product.isNew && (
-        <div className="absolute top-4 left-0 z-20 border border-[#ff5500] text-[#ff5500] px-4 py-1 font-headline text-sm clip-parallelogram bg-black/80">
-          NEW
-        </div>
-      )}
-
-      {/* Clickable product area */}
-      <Link
-        to={`/products/${product.slug}`}
-        state={{ backgroundLocation: location }}
-        className="block flex-1"
-      >
-        {/* Image area */}
-        <div className="relative aspect-square overflow-hidden mb-4">
-          {hasImg ? (
-            <>
-              <img
-                src={product.img1}
-                alt={product.name}
-                className="w-full h-full object-cover transition-opacity duration-500 group-hover:opacity-0"
-              />
-              <img
-                src={product.img2}
-                alt={`${product.name} detail`}
-                className="absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-500 group-hover:opacity-100"
-              />
-            </>
-          ) : (
-            <ImgPlaceholder category={product.category} />
-          )}
-
-          {/* ORDER NOW button slides up on hover */}
-          <div className="absolute inset-0 flex items-end justify-center pb-6">
-            <span className="order-btn clip-parallelogram bg-white text-black px-8 py-2 font-headline text-xl hover:bg-[#ff5500] hover:text-white transition-colors">
-              ORDER NOW
-            </span>
-          </div>
-        </div>
-
-        {/* Info */}
-        <div className="space-y-1">
-          <span className="font-technical text-[10px] text-[#ff5500] uppercase">{product.category}</span>
-          <h4 className="text-white font-medium text-lg leading-tight truncate">{product.name}</h4>
-
-          {/* Stars */}
-          <div className="flex items-center gap-0.5 text-orange-500 text-xs">
-            {[1, 2, 3, 4, 5].map((star) => (
-              <span
-                key={star}
-                className="material-symbols-outlined"
-                style={{
-                  fontSize: 14,
-                  fontVariationSettings: `'FILL' ${star <= product.rating ? 1 : 0}`,
-                }}
-              >
-                star
-              </span>
-            ))}
-          </div>
-
-          {/* Price */}
-          <div className="flex items-baseline gap-2 mt-2">
-            <span className="font-headline text-2xl text-[#ff5500]">
-              {product.price.toLocaleString('en-IN')}৳
-            </span>
-            {product.sale && product.originalPrice && (
-              <span className="font-technical text-stone-600 text-xs line-through">
-                {product.originalPrice.toLocaleString('en-IN')}৳
-              </span>
-            )}
-          </div>
-        </div>
-      </Link>
-
-      {/* Add to Cart button */}
-      <button
-        onClick={handleAddToCart}
-        className="mt-3 clip-parallelogram bg-[#ff5500] text-white font-headline text-xl py-2
-                   hover:shadow-[0_0_20px_rgba(255,85,0,0.3)] transition-all"
-      >
-        ADD TO CART
-      </button>
-    </motion.div>
-  );
-}
-
 /* ─── Main Page ──────────────────────────────────────────────── */
 
 export default function LandingPage() {
-  const location  = useLocation();
-  const addItem   = useCartStore((state) => state.addItem);
-  const openCart  = useCartStore((state) => state.openCart);
+  const location = useLocation();
 
   /* Typewriter */
   const [twText,    setTwText]    = useState('');
@@ -259,7 +121,7 @@ export default function LandingPage() {
 
   return (
     <main>
-      {/* â”€â”€ 01 HERO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── 01 HERO ──────────────────────────────────────────────── */}
       <section className="relative min-h-screen flex flex-col items-center justify-center orange-grid overflow-hidden pt-[calc(36px+80px)]">
         <div className="absolute inset-0 text-[#ff5500]">
           <FloatingPaths position={1} />
@@ -291,13 +153,13 @@ export default function LandingPage() {
           </div>
 
           <div className="flex flex-col md:flex-row gap-6 mt-12 justify-center">
-            <a
-              href="#collections"
+            <Link
+              to="/shop"
               className="clip-parallelogram bg-[#ff5500] text-white px-12 py-4 font-headline text-3xl
                          hover:shadow-[0_0_30px_rgba(255,85,0,0.5)] transition-all flex items-center justify-center"
             >
               Shop Now
-            </a>
+            </Link>
             <Link
               to="/quote"
               className="clip-parallelogram border-2 border-orange-500/50 text-orange-500 bg-orange-500/5
@@ -361,78 +223,76 @@ export default function LandingPage() {
           <div className="signature-divider mt-4 opacity-30" />
         </motion.div>
 
-        <motion.div
-          className="grid grid-cols-1 md:grid-cols-4 gap-6"
-          variants={stagger}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: true, margin: '-80px' }}
+        {/* Scrollable category row */}
+        <div
+          className="h-scroll overflow-x-auto overflow-y-hidden pb-3 -mx-8 px-8"
+          style={{ scrollbarColor: '#ff5500 rgba(255,255,255,0.04)' }}
         >
-          {COLLECTION_CARDS.map((card) => (
-            <motion.div
-              key={card.num}
-              variants={fadeUp}
-              transition={{ duration: 0.5 }}
-              className={`group relative overflow-hidden border border-white/5 hover-glow cursor-pointer
-                          ${card.span === 2 ? 'md:col-span-2 min-h-[400px]' : 'aspect-[4/5]'}
-                          ${card.cosplay ? 'bg-transparent' : 'bg-[#161616]'}`}
-            >
-              {card.cosplay && (
-                <div className="absolute inset-0 bg-orange-900/20 group-hover:bg-orange-900/40 transition-colors" />
-              )}
+          <motion.div
+            className="flex gap-4 min-w-max"
+            variants={stagger}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true, margin: '-80px' }}
+          >
+            {CATEGORIES.map((cat, i) => (
+              <motion.div
+                key={cat.slug}
+                variants={fadeUp}
+                transition={{ duration: 0.4 }}
+                className="group flex-shrink-0 w-[260px] h-[340px] relative overflow-hidden border border-white/5 hover-glow bg-[#161616]"
+              >
+                <Link to={`/shop/${cat.slug}`} className="absolute inset-0 overflow-hidden p-7 flex flex-col justify-between">
+                  <div className="flex justify-between items-start">
+                    <span className="font-technical text-stone-600 text-xs">
+                      {String(i + 1).padStart(2, '0')}
+                    </span>
+                    <span className="material-symbols-outlined text-[#ff5500] text-base opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      arrow_outward
+                    </span>
+                  </div>
+                  <div>
+                    <h3 className="font-headline text-[2.2rem] leading-tight text-white">
+                      {cat.name.toUpperCase()}
+                    </h3>
+                    <div className="mt-2 h-px w-0 bg-[#ff5500] group-hover:w-full transition-all duration-300" />
+                  </div>
+                </Link>
+              </motion.div>
+            ))}
 
-              <div className="absolute inset-0 p-8 flex flex-col justify-between">
+            {/* Custom Orders — always last */}
+            <motion.div
+              variants={fadeUp}
+              transition={{ duration: 0.4 }}
+              className="group flex-shrink-0 w-[320px] h-[340px] relative overflow-hidden bg-[#ff5500]"
+            >
+              <Link to="/quote" className="absolute inset-0 overflow-hidden p-7 flex flex-col justify-between">
                 <div className="flex justify-between items-start">
-                  <span className="font-technical text-stone-500 text-sm">
-                    {card.num} // {card.count}
+                  <span className="font-technical text-black/50 text-xs">
+                    {String(CATEGORIES.length + 1).padStart(2, '0')}
                   </span>
-                  <span
-                    className="material-symbols-outlined text-[#ff5500] opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
+                  <span className="material-symbols-outlined text-black text-base">
                     arrow_outward
                   </span>
                 </div>
                 <div>
-                  <h3
-                    className={`font-headline text-white ${
-                      card.span === 2 ? 'text-5xl' : 'text-4xl'
-                    }`}
-                  >
-                    {card.title}
+                  <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none">
+                    <span className="font-headline text-[9rem] text-black/10 leading-none select-none">
+                      CUSTOM
+                    </span>
+                  </div>
+                  <h3 className="font-headline text-[2.2rem] leading-tight text-black relative">
+                    CUSTOM ORDERS
                   </h3>
-                  <p className="text-stone-400 opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 transition-all duration-300">
-                    {card.sub}
+                  <p className="mt-1 font-technical text-[10px] text-black/60 uppercase tracking-widest relative">
+                    Have a file? We print it.
                   </p>
                 </div>
-              </div>
+              </Link>
             </motion.div>
-          ))}
-
-          {/* Card 8 — Custom Orders */}
-          <motion.div
-            variants={fadeUp}
-            transition={{ duration: 0.5 }}
-            className="group relative md:col-span-2 min-h-[400px] bg-[#ff5500] overflow-hidden hover:bg-[#ff5500]/90 transition-colors cursor-pointer"
-          >
-            <div className="absolute inset-0 flex items-center justify-center opacity-10 overflow-hidden">
-              <span className="font-headline text-[20rem] text-black leading-none select-none">
-                CUSTOM
-              </span>
-            </div>
-            <div className="absolute inset-0 p-8 flex flex-col justify-between">
-              <div className="flex justify-between items-start">
-                <span className="font-technical text-black/60 text-sm">08 // UNLIMITED</span>
-                <span className="material-symbols-outlined text-black">arrow_outward</span>
-              </div>
-              <div>
-                <h3 className="font-headline text-7xl text-black">CUSTOM ORDERS</h3>
-                <p className="text-black/80 text-xl font-medium">
-                  Have a specific file? We print it for you.
-                </p>
-              </div>
-            </div>
           </motion.div>
-        </motion.div>
+        </div>
       </section>
 
       {/* ── 04 BEST SELLERS ──────────────────────────────────── */}
@@ -487,13 +347,13 @@ export default function LandingPage() {
 
           {/* CTA */}
           <div className="mt-20 flex justify-center">
-            <a
-              href="#collections"
+            <Link
+              to="/shop"
               className="clip-parallelogram bg-[#ff5500] text-white px-12 py-4 font-headline text-3xl
                          hover:shadow-[0_0_30px_rgba(255,85,0,0.5)] transition-all flex items-center justify-center"
             >
-              Shop Now
-            </a>
+              View All Products
+            </Link>
           </div>
         </div>
       </section>
@@ -514,41 +374,14 @@ export default function LandingPage() {
         </motion.div>
 
         <motion.div
-          className="grid grid-cols-1 md:grid-cols-3 gap-6"
+          className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6"
           variants={stagger}
           initial="hidden"
           whileInView="show"
           viewport={{ once: true, margin: '-60px' }}
         >
-          {newProducts.map((item, i) => (
-            <motion.div
-              key={item.id}
-              variants={fadeUp}
-              transition={{ duration: 0.5 }}
-              className={`relative min-h-[300px] overflow-hidden border border-white/5 group
-                          hover-glow p-8 flex flex-col gap-4
-                          ${i === 1 ? 'bg-stone-900' : 'bg-[#161616]'}`}
-            >
-              <div className="flex justify-between items-start">
-                <span className="font-headline text-[#ff5500] text-xl">NEW</span>
-                <span className="font-headline text-white text-3xl">
-                  {item.price.toLocaleString('en-IN')}৳
-                </span>
-              </div>
-              <div className="flex-1">
-                <h3 className="font-headline text-5xl text-white mb-2">{item.name}</h3>
-                <p className="font-technical text-stone-500 text-xs uppercase tracking-widest">
-                  {item.series}
-                </p>
-              </div>
-              <button
-                onClick={() => { addItem(item); openCart(); }}
-                className="clip-parallelogram bg-[#ff5500] text-white font-headline text-xl py-2
-                           hover:shadow-[0_0_20px_rgba(255,85,0,0.3)] transition-all"
-              >
-                ADD TO CART
-              </button>
-            </motion.div>
+          {newProducts.map((product) => (
+            <ProductCard key={product.id} product={product} location={location} />
           ))}
         </motion.div>
       </section>
@@ -605,7 +438,6 @@ export default function LandingPage() {
           </motion.div>
         </div>
       </section>
-
 
       {/* ── 07 FAQ ───────────────────────────────────────────── */}
       <section className="py-32 px-8 max-w-4xl mx-auto">
@@ -671,4 +503,3 @@ export default function LandingPage() {
     </main>
   );
 }
-

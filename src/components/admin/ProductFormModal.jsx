@@ -1,11 +1,20 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { parseProductImages } from '../../lib/productImages';
 import { supabase } from '../../lib/supabase';
 
 const CATEGORIES = [
   'Gaming Accessories',
-  'Collectibles',
+  'Headphone Stands',
+  'Busts',
   'Masks',
+  'Diorama',
+  'Keycap',
+  'Flower Vases',
+  'Desk Accessories',
+  'Pegboard Accessories',
+  'Room Decor',
+  'Collectibles',
   'Headphone Gear',
   'Sculptures',
   'Custom',
@@ -43,54 +52,6 @@ function validateSlug(slug) {
   return null;
 }
 
-function isMissingImagesColumnError(error) {
-  return typeof error?.message === 'string' && error.message.toLowerCase().includes('images');
-}
-
-function parseProductImages(imageValue, imagesValue) {
-  if (Array.isArray(imagesValue)) {
-    return imagesValue.filter((value) => typeof value === 'string' && value.trim());
-  }
-
-  if (typeof imageValue === 'string') {
-    const trimmed = imageValue.trim();
-    if (!trimmed) return [];
-
-    if (trimmed.startsWith('[')) {
-      try {
-        const parsed = JSON.parse(trimmed);
-        if (Array.isArray(parsed)) {
-          return parsed.filter((value) => typeof value === 'string' && value.trim());
-        }
-      } catch {
-        // Fall back to single-image mode if the stored value is not valid JSON.
-      }
-    }
-
-    return [trimmed];
-  }
-
-  return [];
-}
-
-async function saveProductRow(query, row, imageUrls) {
-  const { error } = await query(row);
-  if (!error) return { error: null, usedFallback: false };
-
-  if (!isMissingImagesColumnError(error)) {
-    return { error, usedFallback: false };
-  }
-
-  const fallbackRow = {
-    ...row,
-    image: imageUrls.length <= 1 ? (imageUrls[0] ?? '') : JSON.stringify(imageUrls),
-  };
-  delete fallbackRow.images;
-
-  const fallbackResult = await query(fallbackRow);
-  return { error: fallbackResult.error, usedFallback: !fallbackResult.error };
-}
-
 function Field({ label, error, children }) {
   return (
     <div className="space-y-1">
@@ -117,11 +78,8 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
   const [newArrival, setNewArrival] = useState(product?.new_arrival ?? false);
   const [imageUrls, setImageUrls] = useState(initialImages);
 
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
-  const [uploadSuccess, setUploadSuccess] = useState(false);
   const [uploadError, setUploadError] = useState(null);
 
   const [fieldErrors, setFieldErrors] = useState({});
@@ -144,12 +102,6 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose, saving, uploading]);
 
-  useEffect(() => {
-    return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-    };
-  }, [previewUrl]);
-
   const handleNameChange = (val) => {
     setName(val);
     if (!isEdit) {
@@ -167,14 +119,13 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
 
   const handleFileSelect = (e) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
 
     if (imageUrls.length >= MAX_IMAGE_COUNT) {
       setUploadError(`You can upload up to ${MAX_IMAGE_COUNT} images per product.`);
-      e.target.value = '';
       return;
     }
-
     if (!ALLOWED_TYPES.includes(file.type)) {
       setUploadError('Only JPG, PNG, and WebP images are allowed.');
       return;
@@ -185,37 +136,21 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
     }
 
     setUploadError(null);
-    setUploadSuccess(false);
-    setUploadProgress(0);
-    setSelectedFile(file);
-
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setPreviewUrl(URL.createObjectURL(file));
-    e.target.value = '';
-  };
-
-  const handleUpload = () => {
-    if (!selectedFile) return;
-    if (imageUrls.length >= MAX_IMAGE_COUNT) {
-      setUploadError(`You can upload up to ${MAX_IMAGE_COUNT} images per product.`);
-      return;
-    }
     setUploading(true);
-    setUploadError(null);
     setUploadProgress(0);
 
     const folder = `layercade/products/${categoryToFolder(category)}`;
     const formData = new FormData();
-    formData.append('file', selectedFile);
+    formData.append('file', file);
     formData.append('upload_preset', UPLOAD_PRESET);
     formData.append('folder', folder);
 
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`);
 
-    xhr.upload.addEventListener('progress', (e) => {
-      if (e.lengthComputable) {
-        setUploadProgress(Math.round((e.loaded / e.total) * 100));
+    xhr.upload.addEventListener('progress', (evt) => {
+      if (evt.lengthComputable) {
+        setUploadProgress(Math.round((evt.loaded / evt.total) * 100));
       }
     });
 
@@ -224,14 +159,7 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
       if (xhr.status === 200) {
         const data = JSON.parse(xhr.responseText);
         setImageUrls((prev) => [...prev, data.secure_url]);
-        setUploadSuccess(true);
-        setUploadProgress(100);
         setFieldErrors((prev) => ({ ...prev, image: undefined }));
-        setSelectedFile(null);
-        if (previewUrl) {
-          URL.revokeObjectURL(previewUrl);
-          setPreviewUrl(null);
-        }
       } else {
         setUploadError('Upload failed. Check your Cloudinary upload preset.');
       }
@@ -295,21 +223,13 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
         return;
       }
       row.sort_order = 999;
-      const { error, usedFallback } = await saveProductRow(
-        (nextRow) => supabase.from('products').insert(nextRow),
-        row,
-        imageUrls,
-      );
+      const { error } = await supabase.from('products').insert(row);
       if (error) {
         setSaveError(error.message);
         setSaving(false);
         return;
       }
-      onSuccess(
-        usedFallback
-          ? 'Product added. Run the product images SQL migration to enable the new images column.'
-          : 'Product added successfully.',
-      );
+      onSuccess('Product added successfully.');
     } else {
       if (slug !== product.slug) {
         const { data: existing } = await supabase
@@ -323,21 +243,13 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
           return;
         }
       }
-      const { error, usedFallback } = await saveProductRow(
-        (nextRow) => supabase.from('products').update(nextRow).eq('id', product.id),
-        row,
-        imageUrls,
-      );
+      const { error } = await supabase.from('products').update(row).eq('id', product.id);
       if (error) {
         setSaveError(error.message);
         setSaving(false);
         return;
       }
-      onSuccess(
-        usedFallback
-          ? 'Product updated. Run the product images SQL migration to enable the new images column.'
-          : 'Product updated successfully.',
-      );
+      onSuccess('Product updated successfully.');
     }
 
     setSaving(false);
@@ -348,36 +260,34 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
     'w-full bg-[#161616] border border-white/10 text-white font-body text-sm px-3 py-4 md:py-3 ' +
     'focus:outline-none focus:border-[#ff5500] transition-colors placeholder:text-stone-700';
 
+  // Only saving locks the text fields — uploading does not.
+  const isFormLocked = saving;
+  // Image controls and the action buttons are locked during both upload and save.
   const isLocked = saving || uploading;
 
   const removeImageAtIndex = (index) => {
-    setImageUrls((prev) => prev.filter((_, currentIndex) => currentIndex !== index));
-    setUploadSuccess(false);
+    setImageUrls((prev) => prev.filter((_, i) => i !== index));
     setFieldErrors((prev) => ({ ...prev, image: undefined }));
   };
 
   const moveImage = (fromIndex, toIndex) => {
     if (toIndex < 0 || toIndex >= imageUrls.length) return;
-
     setImageUrls((prev) => {
       const next = [...prev];
-      const [movedImage] = next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, movedImage);
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
       return next;
     });
-    setUploadSuccess(false);
   };
 
   return (
     <motion.div
-      className="fixed inset-0 z-[150] bg-black/70 backdrop-blur-sm overflow-y-auto flex items-start md:items-start justify-center md:p-4"
+      className="fixed inset-0 z-[150] bg-black/70 backdrop-blur-sm overflow-y-auto flex items-start justify-center md:p-4"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
-      onClick={() => {
-        if (!isLocked) onClose();
-      }}
+      onClick={() => { if (!isLocked) onClose(); }}
     >
       <motion.div
         className="relative w-full min-h-screen md:min-h-0 md:max-w-2xl md:my-8 bg-[#111111] border-0 md:border md:border-white/10 p-6 md:p-8"
@@ -387,28 +297,8 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
         transition={{ duration: 0.25, ease: 'easeOut' }}
         onClick={(e) => e.stopPropagation()}
       >
-        {uploading && (
-          <div className="absolute inset-0 z-10 bg-[#111111]/80 flex flex-col items-center justify-center gap-4">
-            <svg className="animate-spin w-8 h-8 text-[#ff5500]" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-            </svg>
-            <p className="font-technical text-sm text-white uppercase tracking-widest">
-              Uploading {uploadProgress}%
-            </p>
-            <div className="w-48 h-1.5 bg-white/10 overflow-hidden">
-              <div
-                className="h-full bg-[#ff5500] transition-all duration-200"
-                style={{ width: `${uploadProgress}%` }}
-              />
-            </div>
-          </div>
-        )}
-
         <button
-          onClick={() => {
-            if (!isLocked) onClose();
-          }}
+          onClick={() => { if (!isLocked) onClose(); }}
           disabled={isLocked}
           className="absolute top-4 right-4 text-stone-500 hover:text-[#ff5500] transition-colors disabled:opacity-40 disabled:pointer-events-none"
         >
@@ -430,7 +320,7 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
               value={name}
               onChange={(e) => handleNameChange(e.target.value)}
               placeholder="e.g. Batman Controller Stand"
-              disabled={isLocked}
+              disabled={isFormLocked}
               className={inputClass}
             />
           </Field>
@@ -441,7 +331,7 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
               value={slug}
               onChange={(e) => handleSlugChange(e.target.value)}
               placeholder="e.g. batman-controller-stand"
-              disabled={isLocked}
+              disabled={isFormLocked}
               className={inputClass}
             />
             <p className="font-technical text-[10px] text-stone-600 mt-1">
@@ -455,7 +345,7 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Short product description..."
-              disabled={isLocked}
+              disabled={isFormLocked}
               className={inputClass + ' resize-none'}
             />
           </Field>
@@ -470,7 +360,7 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 placeholder="0"
-                disabled={isLocked}
+                disabled={isFormLocked}
                 className={inputClass + ' pl-12'}
               />
             </div>
@@ -482,7 +372,7 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  disabled={isLocked}
+                  disabled={isFormLocked}
                   className={inputClass + ' appearance-none cursor-pointer pr-8'}
                 >
                   {CATEGORIES.map((c) => (
@@ -498,7 +388,7 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
                 <select
                   value={stockStatus}
                   onChange={(e) => setStockStatus(e.target.value)}
-                  disabled={isLocked}
+                  disabled={isFormLocked}
                   className={inputClass + ' appearance-none cursor-pointer pr-8'}
                 >
                   {STOCK_OPTIONS.map((o) => (
@@ -511,10 +401,10 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
           </div>
 
           <Field label="Product Images *" error={fieldErrors.image ?? uploadError}>
-            {imageUrls.length > 0 && (
+            {(imageUrls.length > 0 || uploading) && (
               <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {imageUrls.map((imageUrl, index) => (
-                  <div key={`${imageUrl}-${index}`} className="border border-white/10 bg-[#0f0f0f] p-2">
+                  <div key={index} className="border border-white/10 bg-[#0f0f0f] p-2">
                     <div className="aspect-square overflow-hidden">
                       <img
                         src={imageUrl}
@@ -558,16 +448,29 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
                     </div>
                   </div>
                 ))}
-              </div>
-            )}
 
-            {previewUrl && (
-              <div className="mb-3">
-                <img
-                  src={previewUrl}
-                  alt="Upload preview"
-                  className="max-h-48 max-w-full w-auto object-contain mx-auto border border-white/10"
-                />
+                {uploading && (
+                  <div className="border border-white/10 border-dashed bg-[#0f0f0f] p-2">
+                    <div className="aspect-square flex flex-col items-center justify-center gap-2">
+                      <svg className="animate-spin w-6 h-6 text-[#ff5500]" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                      </svg>
+                      <p className="font-technical text-[10px] text-stone-400 uppercase tracking-widest">
+                        {uploadProgress}%
+                      </p>
+                      <div className="w-3/4 h-1 bg-white/10 overflow-hidden">
+                        <div
+                          className="h-full bg-[#ff5500] transition-all duration-200"
+                          style={{ width: `${uploadProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                    <p className="mt-2 font-technical text-[10px] uppercase tracking-widest text-stone-600 text-center">
+                      Uploading…
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
@@ -594,42 +497,8 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
             </button>
 
             <p className="font-technical text-[10px] text-stone-700 mt-1">
-              JPG, PNG or WebP, max 5 MB each, up to 6 images
+              JPG, PNG or WebP · max 5 MB · up to 6 images · uploads immediately on selection
             </p>
-
-            {selectedFile && !uploadSuccess && (
-              <div className="mt-3">
-                <button
-                  type="button"
-                  onClick={handleUpload}
-                  disabled={isLocked}
-                  className="clip-parallelogram bg-[#ff5500] text-white font-technical text-xs uppercase tracking-widest px-6 py-3 flex items-center gap-2 hover:shadow-[0_0_16px_rgba(255,85,0,0.3)] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  Upload to Cloudinary
-                </button>
-              </div>
-            )}
-
-            {uploadSuccess && (
-              <div className="mt-2 flex items-center gap-2 font-technical text-[10px] text-green-400 uppercase tracking-widest">
-                <span className="material-symbols-outlined" style={{ fontSize: 14, fontVariationSettings: "'FILL' 1" }}>check_circle</span>
-                Uploaded successfully
-              </div>
-            )}
-
-            {imageUrls.length > 0 && (
-              <div className="mt-3 space-y-1">
-                {imageUrls.map((imageUrl, index) => (
-                  <input
-                    key={`${imageUrl}-field-${index}`}
-                    type="text"
-                    readOnly
-                    value={imageUrl}
-                    className="w-full bg-[#0a0a0a] border border-white/5 text-stone-600 font-technical text-[10px] p-2 focus:outline-none truncate"
-                  />
-                ))}
-              </div>
-            )}
           </Field>
 
           <div className="space-y-3">
@@ -638,7 +507,7 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
                 type="checkbox"
                 checked={featured}
                 onChange={(e) => setFeatured(e.target.checked)}
-                disabled={isLocked}
+                disabled={isFormLocked}
                 className="w-4 h-4 accent-[#ff5500]"
               />
               <span className="font-body text-stone-300 text-sm group-hover:text-white transition-colors select-none">
@@ -650,7 +519,7 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
                 type="checkbox"
                 checked={newArrival}
                 onChange={(e) => setNewArrival(e.target.checked)}
-                disabled={isLocked}
+                disabled={isFormLocked}
                 className="w-4 h-4 accent-[#ff5500]"
               />
               <span className="font-body text-stone-300 text-sm group-hover:text-white transition-colors select-none">
@@ -681,9 +550,7 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
           <div className="flex gap-3 pt-2">
             <button
               type="button"
-              onClick={() => {
-                if (!isLocked) onClose();
-              }}
+              onClick={() => { if (!isLocked) onClose(); }}
               disabled={isLocked}
               className="flex-1 py-4 md:py-3 font-technical text-xs uppercase tracking-widest bg-white/10 text-stone-300 hover:bg-white/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >

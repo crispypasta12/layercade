@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { fetchProducts, getProductBySlug } from '../data/products';
+import { getProductBySlug, getRelatedProducts } from '../data/products';
 import { useCartStore } from '../store/cartStore';
 
 function formatStockStatus(status) {
@@ -9,16 +9,17 @@ function formatStockStatus(status) {
   return status.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function DetailStat({ label, value, accent }) {
+function StockBadge({ status }) {
+  const label = formatStockStatus(status);
+  const color =
+    status === 'in_stock'     ? 'border-green-800/60 bg-green-950/30 text-green-300' :
+    status === 'out_of_stock' ? 'border-red-800/60 bg-red-950/30 text-red-300' :
+    status === 'low_stock'    ? 'border-yellow-800/60 bg-yellow-950/30 text-yellow-300' :
+                                'border-white/10 bg-white/5 text-stone-400';
   return (
-    <div className="border border-white/10 bg-[#161616] p-4">
-      <p className="font-technical text-[10px] uppercase tracking-[0.25em] text-stone-500">
-        {label}
-      </p>
-      <p className={`mt-2 text-sm ${accent ? 'text-[#ff5500]' : 'text-white'}`}>
-        {value}
-      </p>
-    </div>
+    <span className={`border px-2 py-0.5 font-technical text-[10px] uppercase tracking-[0.2em] ${color}`}>
+      {label}
+    </span>
   );
 }
 
@@ -28,7 +29,6 @@ export default function ProductModalPage() {
   const location = useLocation();
   const isOverlay = Boolean(location.state?.backgroundLocation);
   const addItem = useCartStore((state) => state.addItem);
-  const openCart = useCartStore((state) => state.openCart);
 
   const [product, setProduct] = useState(null);
   const [relatedProducts, setRelatedProducts] = useState([]);
@@ -39,29 +39,25 @@ export default function ProductModalPage() {
 
   useEffect(() => {
     let isMounted = true;
+    setLoading(true);
+    setProduct(null);
+    setRelatedProducts([]);
 
-    Promise.all([getProductBySlug(slug), fetchProducts()]).then(([currentProduct, allProducts]) => {
+    getProductBySlug(slug).then((currentProduct) => {
       if (!isMounted) return;
-
       setProduct(currentProduct);
-      setSelectedImage(currentProduct?.img1 ?? null);
+      setSelectedImage(currentProduct?.images?.[0] ?? currentProduct?.img1 ?? null);
 
-      const related = (allProducts ?? [])
-        .filter((item) => item.slug !== slug)
-        .sort((a, b) => {
-          const sameCategoryA = a.category === currentProduct?.category ? 1 : 0;
-          const sameCategoryB = b.category === currentProduct?.category ? 1 : 0;
-          return sameCategoryB - sameCategoryA;
-        })
-        .slice(0, 3);
+      if (currentProduct) {
+        getRelatedProducts(currentProduct.category, slug).then((related) => {
+          if (isMounted) setRelatedProducts(related);
+        });
+      }
 
-      setRelatedProducts(related);
       setLoading(false);
     });
 
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
   }, [slug]);
 
   useEffect(() => {
@@ -73,15 +69,13 @@ export default function ProductModalPage() {
   useEffect(() => {
     if (!isOverlay) return undefined;
     document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = '';
-    };
+    return () => { document.body.style.overflow = ''; };
   }, [isOverlay]);
 
+  // Fix #1 — don't open the cart drawer; the inline message is enough feedback
   const handleAddToCart = () => {
     if (!product) return;
     addItem(product, quantity);
-    openCart();
     setCartMessage(quantity === 1 ? 'Added to cart.' : `${quantity} items added to cart.`);
   };
 
@@ -96,7 +90,9 @@ export default function ProductModalPage() {
   if (loading) {
     return (
       <div
-        className={isOverlay ? 'fixed inset-0 z-[120] bg-black/70 backdrop-blur-sm p-4 md:p-8 flex items-center justify-center' : 'pt-44 pb-24 px-8 max-w-4xl mx-auto flex items-center justify-center min-h-[60vh]'}
+        className={isOverlay
+          ? 'fixed inset-0 z-[120] bg-black/70 backdrop-blur-sm p-4 md:p-8 flex items-center justify-center'
+          : 'pt-44 pb-24 px-8 max-w-4xl mx-auto flex items-center justify-center min-h-[60vh]'}
       >
         <p className="font-headline text-2xl text-white uppercase tracking-wider">Loading...</p>
       </div>
@@ -124,9 +120,6 @@ export default function ProductModalPage() {
     ? product.images
     : [...new Set([product.img1, product.img2].filter(Boolean))];
   const activeImage = selectedImage ?? productImages[0] ?? null;
-  const availabilityLabel = formatStockStatus(product.stock_status);
-  const supportLabel = product.featured ? 'Best seller support' : 'Custom quote available';
-  const productionLabel = product.isNew ? 'New arrival' : 'Batch printed';
 
   return (
     <motion.div
@@ -146,6 +139,7 @@ export default function ProductModalPage() {
         transition={{ duration: 0.25, ease: 'easeOut' }}
       >
         <div className="grid grid-cols-1 lg:grid-cols-[1.05fr_0.95fr]">
+          {/* ── Left: images ── */}
           <div className="bg-[#161616] p-4 md:p-6">
             <div className="overflow-hidden border border-white/10 bg-black/30">
               <div className="aspect-square">
@@ -153,11 +147,13 @@ export default function ProductModalPage() {
                   src={activeImage ?? product.img1}
                   alt={product.name}
                   className="h-full w-full object-cover"
+                  onError={(e) => { e.target.style.display = 'none'; }}
                 />
               </div>
             </div>
 
-            {productImages.length > 1 ? (
+            {/* Thumbnail strip — only shown when there are multiple images */}
+            {productImages.length > 1 && (
               <div className="mt-4 grid grid-cols-2 gap-3">
                 {productImages.map((image, index) => (
                   <button
@@ -178,18 +174,10 @@ export default function ProductModalPage() {
                   </button>
                 ))}
               </div>
-            ) : (
-              <div className="mt-4 border border-white/10 bg-[#121212] p-4">
-                <p className="font-technical text-[10px] uppercase tracking-[0.25em] text-stone-500">
-                  Product Snapshot
-                </p>
-                <p className="mt-2 text-sm leading-6 text-stone-300">
-                  Detailed preview for this print. Add more images in the admin panel to build a fuller gallery here.
-                </p>
-              </div>
             )}
           </div>
 
+          {/* ── Right: details ── */}
           <div className="p-6 md:p-10">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -199,10 +187,9 @@ export default function ProductModalPage() {
                 <h1 className="mt-3 font-headline text-5xl md:text-6xl leading-none text-white">
                   {product.name}
                 </h1>
+                {/* Fix #2 — badges only, no redundant stat grid below */}
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <span className="border border-[#ff5500]/30 bg-[#ff5500]/10 px-3 py-1 font-technical text-[10px] uppercase tracking-[0.2em] text-[#ff5500]">
-                    {availabilityLabel}
-                  </span>
+                  <StockBadge status={product.stock_status} />
                   {product.featured && (
                     <span className="border border-white/10 px-3 py-1 font-technical text-[10px] uppercase tracking-[0.2em] text-stone-300">
                       Best Seller
@@ -234,13 +221,6 @@ export default function ProductModalPage() {
               </p>
             </div>
 
-            <div className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-4">
-              <DetailStat label="Category" value={product.category} />
-              <DetailStat label="Availability" value={availabilityLabel} accent />
-              <DetailStat label="Production" value={productionLabel} />
-              <DetailStat label="Support" value={supportLabel} />
-            </div>
-
             <div className="mt-8 border border-white/10 bg-[#141414] p-5">
               <p className="font-technical text-[10px] uppercase tracking-[0.25em] text-stone-500">
                 Overview
@@ -252,8 +232,8 @@ export default function ProductModalPage() {
 
             <div className="mt-8 grid gap-3 text-sm text-stone-300">
               {[
-                'Typical lead time: 3-5 business days for standard orders.',
-                'Cash on delivery checkout is available for Bangladesh orders.',
+                'Typical lead time: 1-2 business days for standard orders.',
+                'Cash on delivery checkout is available.',
                 'Need a custom size or finish? Use Get a Quote before ordering.',
               ].map((note) => (
                 <div key={note} className="flex gap-3 border border-white/8 bg-[#141414] px-4 py-3">
@@ -338,6 +318,7 @@ export default function ProductModalPage() {
           </div>
         </div>
 
+        {/* ── Related products ── */}
         {relatedProducts.length > 0 && (
           <section className="border-t border-white/10 bg-[#101010] p-6 md:p-10">
             <div className="flex items-end justify-between gap-4">
@@ -349,11 +330,9 @@ export default function ProductModalPage() {
                   Related Prints
                 </h2>
               </div>
-              <p className="max-w-sm text-right text-sm text-stone-500">
-                Similar pieces based on category and current catalogue order.
-              </p>
             </div>
 
+            {/* Fix #5 — cards now show price and stock status */}
             <div className="mt-6 grid gap-4 md:grid-cols-3">
               {relatedProducts.map((item) => (
                 <Link
@@ -364,7 +343,7 @@ export default function ProductModalPage() {
                 >
                   <div className="aspect-[4/3] overflow-hidden">
                     <img
-                      src={item.img1}
+                      src={item.images?.[0] ?? item.img1}
                       alt={item.name}
                       className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                     />
@@ -376,9 +355,12 @@ export default function ProductModalPage() {
                     <h3 className="mt-2 font-headline text-3xl leading-none text-white">
                       {item.name}
                     </h3>
-                    <p className="mt-3 text-sm text-stone-500">
-                      {item.price.toLocaleString('en-IN')} BDT
-                    </p>
+                    <div className="mt-3 flex items-center justify-between gap-2">
+                      <p className="font-headline text-xl text-[#ff5500]">
+                        {item.price.toLocaleString('en-IN')} BDT
+                      </p>
+                      <StockBadge status={item.stock_status} />
+                    </div>
                   </div>
                 </Link>
               ))}

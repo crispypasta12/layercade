@@ -192,7 +192,7 @@ export default function CartDrawer() {
                     </span>
                   </div>
                   <p className="font-technical text-stone-600 text-xs">
-                    Delivery fee (৳60) calculated at checkout
+                    Delivery: ৳60 (Dhaka) · ৳120 (outside Dhaka)
                   </p>
                   <button
                     onClick={handleCheckout}

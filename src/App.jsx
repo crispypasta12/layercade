@@ -5,7 +5,6 @@ import AnnouncementBar from './components/AnnouncementBar';
 import Navbar          from './components/Navbar';
 import Footer          from './components/Footer';
 import WhatsAppButton  from './components/WhatsAppButton';
-import Cursor          from './components/Cursor';
 import ProtectedRoute  from './components/ProtectedRoute';
 import LandingPage     from './pages/LandingPage';
 import Gallery         from './pages/Gallery';
@@ -13,6 +12,7 @@ import GetAQuote       from './pages/GetAQuote';
 import Materials       from './pages/Materials';
 import Process         from './pages/Process';
 import ProductModalPage from './pages/ProductModalPage';
+import ShopPage          from './pages/ShopPage';
 import Checkout           from './pages/Checkout';
 import OrderConfirmation  from './pages/OrderConfirmation';
 import AdminLogin         from './pages/admin/Login';
@@ -45,6 +45,8 @@ function Layout() {
         <Route path="/materials" element={<Materials />} />
         <Route path="/process"   element={<Process />} />
         <Route path="/products/:slug" element={<ProductModalPage />} />
+        <Route path="/shop"               element={<ShopPage />} />
+        <Route path="/shop/:categorySlug" element={<ShopPage />} />
         <Route path="/checkout"            element={<Checkout />} />
         <Route path="/order-confirmation" element={<OrderConfirmation />} />
       </Routes>
@@ -64,7 +66,6 @@ function Layout() {
 export default function App() {
   return (
     <BrowserRouter>
-      <Cursor />
       <Routes>
         {/* Admin routes — no site chrome */}
         <Route path="/admin/login" element={<AdminLogin />} />

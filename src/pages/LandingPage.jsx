@@ -3,13 +3,9 @@ import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { getFeaturedProducts, getNewArrivals } from '../data/products';
 import { FloatingPaths } from '@/components/ui/background-paths';
-import { InteractiveRobotSpline } from '@/components/ui/interactive-3d-robot';
 import { useCartStore } from '../store/cartStore';
 
-const ROBOT_SCENE_URL = 'https://prod.spline.design/PyzDhpQ9E5f1E3MT/scene.splinecode';
-
 /* ─── Constants ──────────────────────────────────────────────── */
-
 const TW_WORDS = ['PLA', 'PETG', 'TPU', 'RESIN', 'ASA', 'FLEX'];
 
 const COLLECTION_CARDS = [
@@ -263,18 +259,15 @@ export default function LandingPage() {
 
   return (
     <main>
-      {/* ── 01 HERO ──────────────────────────────────────────── */}
+      {/* â”€â”€ 01 HERO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="relative min-h-screen flex flex-col items-center justify-center orange-grid overflow-hidden pt-[calc(36px+80px)]">
-        {/* Animated background paths */}
         <div className="absolute inset-0 text-[#ff5500]">
           <FloatingPaths position={1} />
           <FloatingPaths position={-1} />
         </div>
 
-        {/* gradient fade to bg */}
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#080808]/60 to-[#080808] pointer-events-none" />
 
-        {/* Logo with glow */}
         <div className="relative w-64 h-64 md:w-96 md:h-96 z-10">
           <div className="absolute inset-0 bg-[#ff5500] blur-[120px] opacity-25 animate-pulse" />
           <img
@@ -284,7 +277,6 @@ export default function LandingPage() {
           />
         </div>
 
-        {/* Headline + typewriter */}
         <div className="z-20 text-center mt-8 px-4">
           <h1 className="font-headline text-7xl md:text-[10rem] leading-none tracking-tighter text-white">
             PRECISION.<br />LAYER BY LAYER.
@@ -317,13 +309,6 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Scroll indicator */}
-        <div className="absolute bottom-10 flex flex-col items-center gap-2 z-20">
-          <span className="font-technical text-[10px] text-stone-500 uppercase tracking-[0.2em]">
-            Initiate Scroll
-          </span>
-          <div className="w-px h-12 bg-gradient-to-b from-[#ff5500] to-transparent" />
-        </div>
       </section>
 
       {/* ── 02 TRUST BAR ─────────────────────────────────────── */}
@@ -371,7 +356,7 @@ export default function LandingPage() {
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
         >
-          <span className="font-technical text-[#ff5500] text-lg">01 — Collections</span>
+          <span className="font-technical text-[#ff5500] text-lg">Collections</span>
           <h2 className="font-headline text-6xl md:text-8xl text-white mt-2">WHAT WE MAKE</h2>
           <div className="signature-divider mt-4 opacity-30" />
         </motion.div>
@@ -464,7 +449,7 @@ export default function LandingPage() {
           >
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
               <div>
-                <span className="font-technical text-[#ff5500] text-lg">02 — Top Picks</span>
+                <span className="font-technical text-[#ff5500] text-lg">Top Picks</span>
                 <h2 className="font-headline text-6xl md:text-8xl text-white mt-2">BEST SELLERS</h2>
               </div>
             </div>
@@ -523,7 +508,7 @@ export default function LandingPage() {
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
         >
-          <span className="font-technical text-[#ff5500] text-lg">03 — Fresh Drops</span>
+          <span className="font-technical text-[#ff5500] text-lg">Fresh Drops</span>
           <h2 className="font-headline text-6xl md:text-8xl text-white mt-2">NEW ARRIVALS</h2>
           <div className="signature-divider mt-4 opacity-30" />
         </motion.div>
@@ -579,7 +564,7 @@ export default function LandingPage() {
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
           >
-            <span className="font-technical text-[#ff5500] text-lg">04 — Reviews</span>
+            <span className="font-technical text-[#ff5500] text-lg">Reviews</span>
             <h2 className="font-headline text-6xl md:text-8xl text-white mt-2">
               COMMUNITY FEEDBACK
             </h2>
@@ -621,20 +606,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── 06.5 INTERACTIVE SHOWCASE ────────────────────────── */}
-      <section className="relative w-full h-screen overflow-hidden bg-[#080808]">
-        <InteractiveRobotSpline
-          scene={ROBOT_SCENE_URL}
-          className="absolute inset-0 w-full h-full z-0"
-        />
-        <div className="absolute top-0 inset-x-0 h-24 bg-gradient-to-b from-[#111111] to-transparent pointer-events-none z-10" />
-        <div className="absolute bottom-0 inset-x-0 h-32 bg-gradient-to-t from-[#080808] to-transparent pointer-events-none z-10" />
-        <div className="absolute bottom-10 left-8 z-20 pointer-events-none">
-          <span className="font-technical text-[10px] text-stone-600 uppercase tracking-widest">
-            // INTERACTIVE — DRAG TO EXPLORE
-          </span>
-        </div>
-      </section>
 
       {/* ── 07 FAQ ───────────────────────────────────────────── */}
       <section className="py-32 px-8 max-w-4xl mx-auto">
@@ -646,7 +617,7 @@ export default function LandingPage() {
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
         >
-          <span className="font-technical text-[#ff5500] text-lg uppercase">05 — FAQ</span>
+          <span className="font-technical text-[#ff5500] text-lg uppercase">FAQ</span>
           <h2 className="font-headline text-6xl md:text-8xl text-white mt-2">COMMON QUESTIONS</h2>
           <p className="text-stone-500 mt-2 font-body">
             Everything you need to know before placing an order.
@@ -700,3 +671,4 @@ export default function LandingPage() {
     </main>
   );
 }
+

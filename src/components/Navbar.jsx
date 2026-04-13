@@ -1,5 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, NavLink } from 'react-router-dom';
+import { useCartStore } from '../store/cartStore';
+import CartDrawer from './CartDrawer';
+import { supabase } from '../lib/supabase';
 
 const navLinks = [
   { label: 'Collections', to: '/#collections' },
@@ -10,8 +13,14 @@ const navLinks = [
 ];
 
 export default function Navbar() {
-  const [scrolled,     setScrolled]     = useState(false);
-  const [menuOpen,     setMenuOpen]     = useState(false);
+  const [scrolled,       setScrolled]       = useState(false);
+  const [menuOpen,       setMenuOpen]       = useState(false);
+  const [logoClicks,     setLogoClicks]     = useState(0);
+  const [adminVisible,   setAdminVisible]   = useState(false);
+  const [pendingCount,   setPendingCount]   = useState(0);
+  const logoClickTimer = useRef(null);
+  const { openCart, items } = useCartStore();
+  const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
@@ -25,6 +34,30 @@ export default function Navbar() {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+
+  // Fetch pending order count once admin link is revealed
+  useEffect(() => {
+    if (!adminVisible) return;
+    supabase
+      .from('orders')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending')
+      .then(({ count }) => setPendingCount(count ?? 0));
+  }, [adminVisible]);
+
+  // 5-click logo easter egg
+  const handleLogoClick = () => {
+    const next = logoClicks + 1;
+    setLogoClicks(next);
+    clearTimeout(logoClickTimer.current);
+    if (next >= 5) {
+      setAdminVisible(true);
+      setLogoClicks(0);
+    } else {
+      // Reset counter if user stops clicking within 2 seconds
+      logoClickTimer.current = setTimeout(() => setLogoClicks(0), 2000);
+    }
+  };
 
   const handleHashLink = (e, to) => {
     if (to.startsWith('/#')) {
@@ -43,6 +76,7 @@ export default function Navbar() {
   };
 
   return (
+    <>
     <nav
       className={`fixed top-[36px] w-full z-[100] flex justify-between items-center px-8 h-20 transition-all duration-300 ${
         scrolled
@@ -50,10 +84,11 @@ export default function Navbar() {
           : 'bg-stone-950/80 backdrop-blur-md border-b border-white/5'
       }`}
     >
-      {/* Logo */}
+      {/* Logo — click 5× to reveal admin link */}
       <Link
         to="/"
-        className="font-headline font-black text-2xl tracking-tighter text-white uppercase italic"
+        onClick={handleLogoClick}
+        className="font-headline font-black text-2xl tracking-tighter text-white uppercase italic select-none"
       >
         Layercade
       </Link>
@@ -88,7 +123,7 @@ export default function Navbar() {
         ))}
       </div>
 
-      {/* CTA Button */}
+      {/* CTA + Cart */}
       <div className="flex items-center gap-4">
         <Link
           to="/quote"
@@ -99,6 +134,36 @@ export default function Navbar() {
         >
           Get a Quote
         </Link>
+
+        {/* Hidden admin link — revealed after 5 logo clicks */}
+        {adminVisible && (
+          <Link
+            to="/admin/orders"
+            className="relative flex items-center justify-center text-stone-600 hover:text-stone-400 transition-colors p-1"
+            title="Admin Panel"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 22 }}>admin_panel_settings</span>
+            {pendingCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white font-technical text-[9px] flex items-center justify-center font-bold px-1">
+                {pendingCount > 99 ? '99+' : pendingCount}
+              </span>
+            )}
+          </Link>
+        )}
+
+        {/* Cart icon */}
+        <button
+          onClick={openCart}
+          aria-label="Open cart"
+          className="relative flex items-center justify-center text-stone-400 hover:text-white transition-colors p-1"
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 28 }}>shopping_cart</span>
+          {totalItems > 0 && (
+            <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#ff5500] text-white font-technical text-[10px] flex items-center justify-center font-bold">
+              {totalItems > 99 ? '99+' : totalItems}
+            </span>
+          )}
+        </button>
 
         {/* Hamburger */}
         <button
@@ -168,5 +233,7 @@ export default function Navbar() {
         </Link>
       </div>
     </nav>
+    <CartDrawer />
+    </>
   );
 }

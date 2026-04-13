@@ -1,23 +1,33 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { productsBySlug } from '../data/products';
+import { getProductBySlug } from '../data/products';
+import { useCartStore } from '../store/cartStore';
 
-function DetailRow({ label, value }) {
-  return (
-    <div className="border-t border-white/10 pt-4">
-      <p className="font-technical text-[10px] uppercase tracking-[0.3em] text-stone-500">{label}</p>
-      <p className="mt-2 text-stone-200">{value}</p>
-    </div>
-  );
-}
 
 export default function ProductModalPage() {
-  const { slug } = useParams();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const product = productsBySlug[slug];
-  const isOverlay = Boolean(location.state?.backgroundLocation);
+  const { slug }    = useParams();
+  const navigate    = useNavigate();
+  const location    = useLocation();
+  const isOverlay   = Boolean(location.state?.backgroundLocation);
+  const addItem     = useCartStore((state) => state.addItem);
+  const openCart    = useCartStore((state) => state.openCart);
+
+  const [product, setProduct] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getProductBySlug(slug).then((p) => {
+      setProduct(p);
+      setLoading(false);
+    });
+  }, [slug]);
+
+  const handleAddToCart = () => {
+    if (!product) return;
+    addItem(product);
+    openCart();
+  };
 
   useEffect(() => {
     if (!isOverlay) return;
@@ -25,6 +35,18 @@ export default function ProductModalPage() {
     return () => { document.body.style.overflow = ''; };
   }, [isOverlay]);
 
+  // Loading state
+  if (loading) {
+    return (
+      <div
+        className={isOverlay ? 'fixed inset-0 z-[120] bg-black/70 backdrop-blur-sm p-4 md:p-8 flex items-center justify-center' : 'pt-44 pb-24 px-8 max-w-4xl mx-auto flex items-center justify-center min-h-[60vh]'}
+      >
+        <p className="font-headline text-2xl text-white uppercase tracking-wider">Loading...</p>
+      </div>
+    );
+  }
+
+  // Not found
   if (!product) {
     return (
       <main className="min-h-screen pt-44 pb-24 px-8 max-w-4xl mx-auto">
@@ -105,54 +127,41 @@ export default function ProductModalPage() {
               <p className="font-headline text-4xl text-[#ff5500]">
                 {product.price.toLocaleString('en-IN')} BDT
               </p>
-              {product.originalPrice && (
-                <p className="pb-1 font-technical text-sm text-stone-500 line-through">
-                  {product.originalPrice.toLocaleString('en-IN')} BDT
-                </p>
-              )}
-            </div>
-
-            <div className="mt-4 flex items-center gap-3 text-sm text-stone-400">
-              <div className="flex items-center gap-0.5 text-orange-500">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <span
-                    key={star}
-                    className="material-symbols-outlined"
-                    style={{
-                      fontSize: 16,
-                      fontVariationSettings: `'FILL' ${star <= product.rating ? 1 : 0}`,
-                    }}
-                  >
-                    star
-                  </span>
-                ))}
-              </div>
-              <span>{product.reviews} reviews</span>
             </div>
 
             <p className="mt-8 text-base leading-7 text-stone-300">
               {product.description}
             </p>
 
-            <div className="mt-10 space-y-5">
-              <DetailRow label="Material" value={product.material} />
-              <DetailRow label="Color" value={product.color} />
-              <DetailRow label="Subtype" value={product.subcategory} />
-            </div>
-
-            <div className="mt-10 flex flex-col gap-4 sm:flex-row">
-              <Link
-                to="/quote"
-                className="clip-parallelogram inline-flex items-center justify-center bg-[#ff5500] px-8 py-4 font-headline text-2xl text-black"
+            <div className="mt-10 flex flex-col gap-4">
+              <button
+                type="button"
+                onClick={handleAddToCart}
+                className="clip-parallelogram inline-flex items-center justify-center bg-[#ff5500]
+                           px-8 py-4 font-headline text-2xl text-white min-h-[56px]
+                           hover:shadow-[0_0_20px_rgba(255,85,0,0.4)] transition-all"
               >
-                Get a Quote
-              </Link>
-              <Link
-                to="/gallery"
-                className="clip-parallelogram inline-flex items-center justify-center border border-[#ff5500]/40 px-8 py-4 font-headline text-2xl text-white transition-colors hover:bg-[#ff5500]/10"
-              >
-                View Gallery
-              </Link>
+                ADD TO CART
+              </button>
+              <div className="flex flex-col gap-4 sm:flex-row">
+                <Link
+                  to="/quote"
+                  className="clip-parallelogram inline-flex items-center justify-center
+                             border border-[#ff5500]/40 px-8 py-4 font-headline text-2xl
+                             text-white transition-colors hover:bg-[#ff5500]/10 min-h-[56px] flex-1"
+                >
+                  Get a Quote
+                </Link>
+                <Link
+                  to="/gallery"
+                  className="clip-parallelogram inline-flex items-center justify-center
+                             border border-white/10 px-8 py-4 font-headline text-2xl
+                             text-stone-400 transition-colors hover:border-white/30 hover:text-white
+                             min-h-[56px] flex-1"
+                >
+                  View Gallery
+                </Link>
+              </div>
             </div>
           </div>
         </div>

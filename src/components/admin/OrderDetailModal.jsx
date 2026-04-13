@@ -52,12 +52,14 @@ function SectionLabel({ children }) {
 
 /* ─── Main component ─────────────────────────────────────────────── */
 
-export default function OrderDetailModal({ order, onClose, onUpdated }) {
+export default function OrderDetailModal({ order, onClose, onUpdated, onDeleted }) {
   const [newStatus,    setNewStatus]    = useState(order.status ?? 'pending');
   const [updating,     setUpdating]     = useState(false);
   const [updateMsg,    setUpdateMsg]    = useState(null); // { type: 'success'|'error', text }
   const [adminNote,    setAdminNote]    = useState(order.admin_notes ?? '');
   const [savingNote,   setSavingNote]   = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting,      setDeleting]      = useState(false);
 
   /* ── Close on Escape ──────────────────────────────────────────── */
   useEffect(() => {
@@ -70,6 +72,7 @@ export default function OrderDetailModal({ order, onClose, onUpdated }) {
   useEffect(() => {
     setNewStatus(order.status ?? 'pending');
     setAdminNote(order.admin_notes ?? '');
+    setConfirmDelete(false);
   }, [order]);
 
   /* ── Update status ────────────────────────────────────────────── */
@@ -117,6 +120,25 @@ export default function OrderDetailModal({ order, onClose, onUpdated }) {
 
     setUpdateMsg({ type: 'success', text: 'Note saved.' });
     onUpdated(data);
+  };
+
+  const handleDeleteOrder = async () => {
+    setDeleting(true);
+    setUpdateMsg(null);
+
+    const { error } = await supabase
+      .from('orders')
+      .delete()
+      .eq('id', order.id);
+
+    setDeleting(false);
+
+    if (error) {
+      setUpdateMsg({ type: 'error', text: 'Failed to delete order. ' + error.message });
+      return;
+    }
+
+    onDeleted(order.id);
   };
 
   /* ── Derived values ───────────────────────────────────────────── */
@@ -410,6 +432,55 @@ export default function OrderDetailModal({ order, onClose, onUpdated }) {
                     'Save Note'
                   )}
                 </button>
+              </div>
+            </section>
+
+            <section>
+              <SectionLabel>Delete Order</SectionLabel>
+              <div className="bg-red-950/20 border border-red-900/50 p-4 space-y-3">
+                <p className="font-body text-sm text-red-200/80 leading-relaxed">
+                  Delete this order permanently. This action cannot be undone.
+                </p>
+                {confirmDelete ? (
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      onClick={handleDeleteOrder}
+                      disabled={deleting}
+                      className="px-4 py-2 bg-red-600 text-white font-technical text-xs uppercase tracking-widest
+                                 hover:bg-red-700 transition-colors disabled:opacity-50
+                                 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      {deleting ? (
+                        <>
+                          <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                          </svg>
+                          Deleting...
+                        </>
+                      ) : (
+                        'Confirm Delete'
+                      )}
+                    </button>
+                    <button
+                      onClick={() => setConfirmDelete(false)}
+                      disabled={deleting}
+                      className="px-4 py-2 border border-white/15 text-stone-300 font-technical text-xs uppercase tracking-widest
+                                 hover:border-white/30 hover:text-white transition-colors disabled:opacity-50
+                                 disabled:cursor-not-allowed"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setConfirmDelete(true)}
+                    className="px-4 py-2 border border-red-500/60 text-red-300 font-technical text-xs uppercase tracking-widest
+                               hover:bg-red-500/10 transition-colors"
+                  >
+                    Delete Order
+                  </button>
+                )}
               </div>
             </section>
 

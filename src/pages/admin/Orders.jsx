@@ -401,6 +401,10 @@ export default function AdminOrders() {
             setOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
             setSelectedOrder(updated);
           }}
+          onDeleted={(deletedId) => {
+            setOrders((prev) => prev.filter((o) => o.id !== deletedId));
+            setSelectedOrder(null);
+          }}
         />
       )}
     </div>

@@ -5,9 +5,39 @@
  */
 import { supabase } from '../lib/supabase';
 
+function parseProductImages(imageValue, imagesValue) {
+  if (Array.isArray(imagesValue)) {
+    return imagesValue.filter((value) => typeof value === 'string' && value.trim());
+  }
+
+  if (typeof imageValue === 'string') {
+    const trimmed = imageValue.trim();
+    if (!trimmed) return [];
+
+    if (trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed.filter((value) => typeof value === 'string' && value.trim());
+        }
+      } catch {
+        // Fall through to single-image behavior if the string is not valid JSON.
+      }
+    }
+
+    return [trimmed];
+  }
+
+  return [];
+}
+
 // ─── Shape adapter ───────────────────────────────────────────────────────────
 // Converts a raw Supabase row into the shape used by existing components.
 function toProduct(row) {
+  const images = parseProductImages(row.image, row.images);
+  const primaryImage = images[0] ?? null;
+  const secondaryImage = images[1] ?? primaryImage;
+
   return {
     // Core fields
     id:           row.id,
@@ -16,10 +46,11 @@ function toProduct(row) {
     description:  row.description ?? '',
     price:        Number(row.price),
     category:     row.category,
-    image:        row.image,
+    image:        primaryImage,
+    images,
     // Derived image fields (components use img1 / img2)
-    img1:         row.image,
-    img2:         row.image,
+    img1:         primaryImage,
+    img2:         secondaryImage,
     // Flags
     featured:     row.featured,
     isBestSeller: row.featured,

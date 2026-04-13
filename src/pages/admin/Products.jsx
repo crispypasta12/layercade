@@ -6,6 +6,32 @@ import ProductFormModal from '../../components/admin/ProductFormModal';
 import DeleteConfirmModal from '../../components/admin/DeleteConfirmModal';
 import Toast from '../../components/Toast';
 
+function parseProductImages(imageValue, imagesValue) {
+  if (Array.isArray(imagesValue)) {
+    return imagesValue.filter((value) => typeof value === 'string' && value.trim());
+  }
+
+  if (typeof imageValue === 'string') {
+    const trimmed = imageValue.trim();
+    if (!trimmed) return [];
+
+    if (trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed.filter((value) => typeof value === 'string' && value.trim());
+        }
+      } catch {
+        // Fall back to plain string if stored value is not valid JSON.
+      }
+    }
+
+    return [trimmed];
+  }
+
+  return [];
+}
+
 /* ─── Constants ──────────────────────────────────────────────────── */
 
 const CATEGORIES = [
@@ -103,7 +129,16 @@ export default function AdminProducts() {
       return;
     }
 
-    setProducts(data ?? []);
+    setProducts(
+      (data ?? []).map((product) => {
+        const images = parseProductImages(product.image, product.images);
+        return {
+          ...product,
+          images,
+          image: images[0] ?? '',
+        };
+      }),
+    );
   }, []);
 
   useEffect(() => { fetchProducts(); }, [fetchProducts]);

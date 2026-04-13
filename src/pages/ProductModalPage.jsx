@@ -120,7 +120,9 @@ export default function ProductModalPage() {
     );
   }
 
-  const productImages = [...new Set([product.img1, product.img2].filter(Boolean))];
+  const productImages = product.images?.length
+    ? product.images
+    : [...new Set([product.img1, product.img2].filter(Boolean))];
   const activeImage = selectedImage ?? productImages[0] ?? null;
   const availabilityLabel = formatStockStatus(product.stock_status);
   const supportLabel = product.featured ? 'Best seller support' : 'Custom quote available';
@@ -182,7 +184,7 @@ export default function ProductModalPage() {
                   Product Snapshot
                 </p>
                 <p className="mt-2 text-sm leading-6 text-stone-300">
-                  Detailed preview for this print. More angles can be added once the product data includes multiple images.
+                  Detailed preview for this print. Add more images in the admin panel to build a fuller gallery here.
                 </p>
               </div>
             )}

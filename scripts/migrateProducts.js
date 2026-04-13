@@ -73,6 +73,7 @@ async function migrate() {
       price:        p.price,
       category:     mapCategory(p.category),
       image:        p.image,
+      images:       p.image ? [p.image] : [],
       featured:     p.isBestSeller ?? false,
       new_arrival:  p.isNew ?? false,
       stock_status: 'in_stock',

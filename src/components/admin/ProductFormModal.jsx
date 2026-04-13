@@ -20,6 +20,7 @@ const STOCK_OPTIONS = [
 const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
+const MAX_IMAGE_COUNT = 6;
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -40,6 +41,10 @@ function validateSlug(slug) {
     return 'Lowercase letters, numbers, and hyphens only (no leading/trailing/consecutive hyphens).';
   }
   return null;
+}
+
+function isMissingImagesColumnError(error) {
+  return typeof error?.message === 'string' && error.message.toLowerCase().includes('images');
 }
 
 function parseProductImages(imageValue, imagesValue) {
@@ -66,6 +71,24 @@ function parseProductImages(imageValue, imagesValue) {
   }
 
   return [];
+}
+
+async function saveProductRow(query, row, imageUrls) {
+  const { error } = await query(row);
+  if (!error) return { error: null, usedFallback: false };
+
+  if (!isMissingImagesColumnError(error)) {
+    return { error, usedFallback: false };
+  }
+
+  const fallbackRow = {
+    ...row,
+    image: imageUrls.length <= 1 ? (imageUrls[0] ?? '') : JSON.stringify(imageUrls),
+  };
+  delete fallbackRow.images;
+
+  const fallbackResult = await query(fallbackRow);
+  return { error: fallbackResult.error, usedFallback: !fallbackResult.error };
 }
 
 function Field({ label, error, children }) {
@@ -146,6 +169,12 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (imageUrls.length >= MAX_IMAGE_COUNT) {
+      setUploadError(`You can upload up to ${MAX_IMAGE_COUNT} images per product.`);
+      e.target.value = '';
+      return;
+    }
+
     if (!ALLOWED_TYPES.includes(file.type)) {
       setUploadError('Only JPG, PNG, and WebP images are allowed.');
       return;
@@ -167,6 +196,10 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
 
   const handleUpload = () => {
     if (!selectedFile) return;
+    if (imageUrls.length >= MAX_IMAGE_COUNT) {
+      setUploadError(`You can upload up to ${MAX_IMAGE_COUNT} images per product.`);
+      return;
+    }
     setUploading(true);
     setUploadError(null);
     setUploadProgress(0);
@@ -219,6 +252,9 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
     if (slugErr) errors.slug = slugErr;
     if (!price || isNaN(Number(price)) || Number(price) < 0) errors.price = 'Enter a valid price.';
     if (imageUrls.length === 0) errors.image = 'Upload at least one image first.';
+    if (imageUrls.length > MAX_IMAGE_COUNT) {
+      errors.image = `You can upload up to ${MAX_IMAGE_COUNT} images per product.`;
+    }
     return errors;
   };
 
@@ -234,15 +270,14 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
     setFieldErrors({});
     setSaving(true);
 
-    const serializedImages = imageUrls.length <= 1 ? (imageUrls[0] ?? '') : JSON.stringify(imageUrls);
-
     const row = {
       name: name.trim(),
       slug: slug.trim(),
       description: description.trim(),
       price: Number(price),
       category,
-      image: serializedImages,
+      image: imageUrls[0] ?? '',
+      images: imageUrls,
       featured,
       new_arrival: newArrival,
       stock_status: stockStatus,
@@ -260,13 +295,21 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
         return;
       }
       row.sort_order = 999;
-      const { error } = await supabase.from('products').insert(row);
+      const { error, usedFallback } = await saveProductRow(
+        (nextRow) => supabase.from('products').insert(nextRow),
+        row,
+        imageUrls,
+      );
       if (error) {
         setSaveError(error.message);
         setSaving(false);
         return;
       }
-      onSuccess('Product added successfully.');
+      onSuccess(
+        usedFallback
+          ? 'Product added. Run the product images SQL migration to enable the new images column.'
+          : 'Product added successfully.',
+      );
     } else {
       if (slug !== product.slug) {
         const { data: existing } = await supabase
@@ -280,16 +323,21 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
           return;
         }
       }
-      const { error } = await supabase
-        .from('products')
-        .update(row)
-        .eq('id', product.id);
+      const { error, usedFallback } = await saveProductRow(
+        (nextRow) => supabase.from('products').update(nextRow).eq('id', product.id),
+        row,
+        imageUrls,
+      );
       if (error) {
         setSaveError(error.message);
         setSaving(false);
         return;
       }
-      onSuccess('Product updated successfully.');
+      onSuccess(
+        usedFallback
+          ? 'Product updated. Run the product images SQL migration to enable the new images column.'
+          : 'Product updated successfully.',
+      );
     }
 
     setSaving(false);
@@ -306,6 +354,18 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
     setImageUrls((prev) => prev.filter((_, currentIndex) => currentIndex !== index));
     setUploadSuccess(false);
     setFieldErrors((prev) => ({ ...prev, image: undefined }));
+  };
+
+  const moveImage = (fromIndex, toIndex) => {
+    if (toIndex < 0 || toIndex >= imageUrls.length) return;
+
+    setImageUrls((prev) => {
+      const next = [...prev];
+      const [movedImage] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, movedImage);
+      return next;
+    });
+    setUploadSuccess(false);
   };
 
   return (
@@ -466,15 +526,35 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
                       <span className="font-technical text-[10px] uppercase tracking-widest text-stone-500">
                         {index === 0 ? 'Primary' : `Image ${index + 1}`}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => removeImageAtIndex(index)}
-                        disabled={isLocked}
-                        className="text-stone-500 hover:text-red-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        aria-label={`Remove image ${index + 1}`}
-                      >
-                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => moveImage(index, index - 1)}
+                          disabled={isLocked || index === 0}
+                          className="text-stone-500 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                          aria-label={`Move image ${index + 1} left`}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_back</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveImage(index, index + 1)}
+                          disabled={isLocked || index === imageUrls.length - 1}
+                          className="text-stone-500 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                          aria-label={`Move image ${index + 1} right`}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_forward</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeImageAtIndex(index)}
+                          disabled={isLocked}
+                          className="text-stone-500 hover:text-red-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          aria-label={`Remove image ${index + 1}`}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -502,15 +582,19 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              disabled={isLocked}
+              disabled={isLocked || imageUrls.length >= MAX_IMAGE_COUNT}
               className="flex items-center gap-2 font-technical text-xs uppercase tracking-widest bg-[#161616] border border-white/10 px-4 py-3 text-stone-300 hover:border-[#ff5500] hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="material-symbols-outlined" style={{ fontSize: 16 }}>image</span>
-              {imageUrls.length > 0 ? 'Add Another Image' : 'Select Image'}
+              {imageUrls.length >= MAX_IMAGE_COUNT
+                ? 'Image Limit Reached'
+                : imageUrls.length > 0
+                  ? 'Add Another Image'
+                  : 'Select Image'}
             </button>
 
             <p className="font-technical text-[10px] text-stone-700 mt-1">
-              JPG, PNG or WebP, max 5 MB each
+              JPG, PNG or WebP, max 5 MB each, up to 6 images
             </p>
 
             {selectedFile && !uploadSuccess && (

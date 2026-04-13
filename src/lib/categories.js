@@ -8,7 +8,7 @@ export const CATEGORIES = [
   { name: 'Busts',                slug: 'busts' },
   { name: 'Masks',                slug: 'masks' },
   { name: 'Diorama',              slug: 'diorama' },
-  { name: 'Keycap',               slug: 'keycap' },
+  { name: 'Keycaps',              slug: 'keycaps' },
   { name: 'Flower Vases',         slug: 'flower-vases' },
   { name: 'Desk Accessories',     slug: 'desk-accessories' },
   { name: 'Pegboard Accessories', slug: 'pegboard-accessories' },

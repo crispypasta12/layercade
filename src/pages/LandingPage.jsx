@@ -5,6 +5,7 @@ import { getFeaturedProducts, getNewArrivals } from '../data/products';
 import { FloatingPaths } from '@/components/ui/background-paths';
 import ProductCard, { fadeUp } from '../components/ProductCard';
 import { CATEGORIES } from '../lib/categories';
+import ParallaxSection from '@/components/ui/parallax-section';
 
 /* ─── Constants ──────────────────────────────────────────────── */
 const TW_WORDS = ['PLA', 'PETG', 'TPU', 'RESIN', 'ASA', 'FLEX'];
@@ -122,7 +123,7 @@ export default function LandingPage() {
   return (
     <main>
       {/* ── 01 HERO ──────────────────────────────────────────────── */}
-      <section className="relative min-h-screen flex flex-col items-center justify-center orange-grid overflow-hidden pt-[calc(36px+80px)]">
+      <section className="relative min-h-[60vh] flex flex-col items-center justify-center orange-grid overflow-hidden pt-[calc(36px+80px)]">
         <div className="absolute inset-0 text-[#ff5500]">
           <FloatingPaths position={1} />
           <FloatingPaths position={-1} />
@@ -130,7 +131,7 @@ export default function LandingPage() {
 
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#080808]/60 to-[#080808] pointer-events-none" />
 
-        <div className="relative w-64 h-64 md:w-96 md:h-96 z-10">
+        <div className="relative w-48 h-48 md:w-64 md:h-64 z-10">
           <div className="absolute inset-0 bg-[#ff5500] blur-[120px] opacity-25 animate-pulse" />
           <img
             src="/logo.png"
@@ -139,8 +140,8 @@ export default function LandingPage() {
           />
         </div>
 
-        <div className="z-20 text-center mt-8 px-4">
-          <h1 className="font-headline text-7xl md:text-[10rem] leading-none tracking-tighter text-white">
+        <div className="z-20 text-center mt-4 px-4">
+          <h1 className="font-headline text-5xl md:text-7xl leading-none tracking-tighter text-white">
             PRECISION.<br />LAYER BY LAYER.
           </h1>
 
@@ -152,7 +153,7 @@ export default function LandingPage() {
             <span className="text-[#ff5500] font-bold typewriter-cursor">{twText}</span>
           </div>
 
-          <div className="flex flex-col md:flex-row gap-6 mt-12 justify-center">
+          <div className="flex flex-col md:flex-row gap-6 mt-8 justify-center">
             <Link
               to="/shop"
               className="clip-parallelogram bg-[#ff5500] text-white px-12 py-4 font-headline text-3xl
@@ -173,8 +174,11 @@ export default function LandingPage() {
 
       </section>
 
+      {/* ── PARALLAX TRANSITION ──────────────────────────────── */}
+      <ParallaxSection />
+
       {/* ── 02 TRUST BAR ─────────────────────────────────────── */}
-      <section className="py-16 bg-[#111111] relative z-30">
+      <section className="py-10 bg-[#111111] relative z-30">
         <motion.div
           className="max-w-7xl mx-auto px-8"
           variants={stagger}
@@ -209,9 +213,9 @@ export default function LandingPage() {
       </section>
 
       {/* ── 03 COLLECTIONS ───────────────────────────────────── */}
-      <section className="py-32 px-8 max-w-7xl mx-auto" id="collections">
+      <section className="py-16 px-8 max-w-7xl mx-auto" id="collections">
         <motion.div
-          className="mb-16"
+          className="mb-10"
           variants={fadeUp}
           initial="hidden"
           whileInView="show"
@@ -296,11 +300,11 @@ export default function LandingPage() {
       </section>
 
       {/* ── 04 BEST SELLERS ──────────────────────────────────── */}
-      <section className="py-32 bg-[#111111] relative" id="best-sellers">
+      <section className="py-16 bg-[#111111] relative" id="best-sellers">
         <div className="max-w-7xl mx-auto px-8">
           {/* Header + filter pills */}
           <motion.div
-            className="mb-16"
+            className="mb-10"
             variants={fadeUp}
             initial="hidden"
             whileInView="show"
@@ -346,7 +350,7 @@ export default function LandingPage() {
           </motion.div>
 
           {/* CTA */}
-          <div className="mt-20 flex justify-center">
+          <div className="mt-12 flex justify-center">
             <Link
               to="/shop"
               className="clip-parallelogram bg-[#ff5500] text-white px-12 py-4 font-headline text-3xl
@@ -359,9 +363,9 @@ export default function LandingPage() {
       </section>
 
       {/* ── 05 NEW ARRIVALS ──────────────────────────────────── */}
-      <section className="py-32 px-8 max-w-7xl mx-auto" id="new-arrivals">
+      <section className="py-16 px-8 max-w-7xl mx-auto" id="new-arrivals">
         <motion.div
-          className="mb-16"
+          className="mb-10"
           variants={fadeUp}
           initial="hidden"
           whileInView="show"
@@ -387,7 +391,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── 06 REVIEWS ───────────────────────────────────────── */}
-      <section className="py-32 bg-[#111111] border-t border-white/5">
+      <section className="py-16 bg-[#111111] border-t border-white/5">
         <div className="max-w-7xl mx-auto px-8">
           <motion.div
             className="mb-16 text-center"
@@ -440,9 +444,9 @@ export default function LandingPage() {
       </section>
 
       {/* ── 07 FAQ ───────────────────────────────────────────── */}
-      <section className="py-32 px-8 max-w-4xl mx-auto">
+      <section className="py-16 px-8 max-w-4xl mx-auto">
         <motion.div
-          className="mb-16"
+          className="mb-10"
           variants={fadeUp}
           initial="hidden"
           whileInView="show"

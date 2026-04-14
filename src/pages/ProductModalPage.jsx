@@ -35,6 +35,7 @@ export default function ProductModalPage() {
   const [selectedImage, setSelectedImage] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [cartMessage, setCartMessage] = useState('');
+  const [addedToCart, setAddedToCart] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -77,6 +78,7 @@ export default function ProductModalPage() {
     if (!product) return;
     addItem(product, quantity);
     setCartMessage(quantity === 1 ? 'Added to cart.' : `${quantity} items added to cart.`);
+    setAddedToCart(true);
   };
 
   const handleBack = () => {
@@ -288,11 +290,22 @@ export default function ProductModalPage() {
               </div>
 
               {cartMessage && (
-                <div className="border border-green-800/60 bg-green-950/30 px-4 py-3">
+                <div className="border border-green-800/60 bg-green-950/30 px-4 py-3 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-green-400 flex-shrink-0" style={{ fontSize: 16, fontVariationSettings: "'FILL' 1" }}>check_circle</span>
                   <p className="font-technical text-[10px] uppercase tracking-[0.2em] text-green-300">
                     {cartMessage}
                   </p>
                 </div>
+              )}
+              {addedToCart && (
+                <button
+                  type="button"
+                  onClick={() => navigate('/checkout')}
+                  className="clip-parallelogram bg-white text-black font-headline text-xl px-6 py-3
+                             hover:bg-[#ff5500] hover:text-white transition-all min-h-[48px] w-full"
+                >
+                  PROCEED TO CHECKOUT →
+                </button>
               )}
 
               <div className="flex flex-col gap-4 sm:flex-row">

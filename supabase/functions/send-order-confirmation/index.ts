@@ -146,9 +146,10 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from:    'Layercade <sales@layercade.com>',
-        to:      order.email,
-        subject: `Order Confirmed — #ORD-${order.id} · Layercade`,
+        from:     'Layercade <sales@layercade.com>',
+        to:       order.email,
+        reply_to: 'sales@layercade.com',
+        subject:  `Order Confirmed — #ORD-${order.id} · Layercade`,
         html,
       }),
     });

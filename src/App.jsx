@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import AnnouncementBar from './components/AnnouncementBar';
@@ -65,6 +66,7 @@ function Layout() {
 
 export default function App() {
   return (
+    <>
     <BrowserRouter>
       <Routes>
         {/* Admin routes — no site chrome */}
@@ -90,5 +92,7 @@ export default function App() {
         <Route path="/*" element={<Layout />} />
       </Routes>
     </BrowserRouter>
+    <SpeedInsights />
+    </>
   );
 }

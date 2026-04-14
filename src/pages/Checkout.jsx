@@ -120,12 +120,14 @@ export default function Checkout() {
   }, [items.length, navigate]);
 
   const [form,        setForm]        = useState(INITIAL_FORM);
+  const [fulfillment, setFulfillment] = useState('delivery'); // 'delivery' | 'pickup'
   const [errors,      setErrors]      = useState({});
   const [loading,     setLoading]     = useState(false);
   const [submitError, setSubmitError] = useState(null);
 
   const subtotal    = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
-  const deliveryFee = form.district && form.district !== 'Dhaka' ? OUTSIDE_FEE : DHAKA_FEE;
+  const deliveryFee = fulfillment === 'pickup' ? 0
+    : form.district && form.district !== 'Dhaka' ? OUTSIDE_FEE : DHAKA_FEE;
   const grandTotal  = subtotal + deliveryFee;
 
   const setField = (key) => (e) => setForm((prev) => ({ ...prev, [key]: e.target.value }));
@@ -142,14 +144,16 @@ export default function Checkout() {
     if (!/^01[3-9]\d{8}$/.test(cleanPhone)) {
       e.phone = 'Enter a valid BD number (e.g. 01712345678)';
     }
-    if (!form.address.trim()) {
-      e.address = 'Delivery address is required';
-    }
-    if (!form.area.trim()) {
-      e.area = 'Area / Thana is required';
-    }
-    if (!form.district) {
-      e.district = 'Please select a district';
+    if (fulfillment === 'delivery') {
+      if (!form.address.trim()) {
+        e.address = 'Delivery address is required';
+      }
+      if (!form.area.trim()) {
+        e.area = 'Area / Thana is required';
+      }
+      if (!form.district) {
+        e.district = 'Please select a district';
+      }
     }
     return e;
   };
@@ -170,17 +174,18 @@ export default function Checkout() {
     const { data, error } = await supabase
       .from('orders')
       .insert([{
-        customer_name:  form.fullName.trim(),
-        email:          form.email.trim().toLowerCase(),
-        phone:          cleanPhone,
-        address:        form.address.trim(),
-        area:           form.area.trim(),
-        district:       form.district,
-        items:          items,
-        total_amount:   grandTotal,
-        delivery_fee:   deliveryFee,
-        payment_method: 'cod',
-        notes:          form.notes.trim() || null,
+        customer_name:    form.fullName.trim(),
+        email:            form.email.trim().toLowerCase(),
+        phone:            cleanPhone,
+        fulfillment_type: fulfillment,
+        address:          fulfillment === 'delivery' ? form.address.trim() : null,
+        area:             fulfillment === 'delivery' ? form.area.trim()    : null,
+        district:         fulfillment === 'delivery' ? form.district        : null,
+        items:            items,
+        total_amount:     grandTotal,
+        delivery_fee:     deliveryFee,
+        payment_method:   'cod',
+        notes:            form.notes.trim() || null,
       }])
       .select()
       .single();
@@ -292,8 +297,10 @@ export default function Checkout() {
               <span>{subtotal.toLocaleString('en-IN')}৳</span>
             </div>
             <div className="flex justify-between font-body text-stone-400 text-sm">
-              <span>Delivery Fee</span>
-              <span className="font-technical">{deliveryFee}৳</span>
+              <span>{fulfillment === 'pickup' ? 'Pickup' : 'Delivery Fee'}</span>
+              <span className="font-technical">
+                {fulfillment === 'pickup' ? 'Free' : `${deliveryFee}৳`}
+              </span>
             </div>
             <div className="signature-divider opacity-30" />
             <div className="flex justify-between items-baseline">
@@ -320,7 +327,7 @@ export default function Checkout() {
             </div>
           </div>
 
-          {/* Delivery note */}
+          {/* Delivery / pickup note */}
           <div className="flex items-start gap-3 px-1">
             <span
               className="material-symbols-outlined text-stone-600 mt-0.5 flex-shrink-0"
@@ -329,8 +336,9 @@ export default function Checkout() {
               info
             </span>
             <p className="font-technical text-[10px] text-stone-600 uppercase tracking-wide leading-relaxed">
-              Inside Dhaka: flat ৳60. Outside Dhaka: ৳120.
-              We'll call before delivery to confirm.
+              {fulfillment === 'pickup'
+                ? 'Pickup from Mirpur DOHS, Dhaka — free of charge. We\'ll call to arrange a time.'
+                : 'Inside Dhaka: flat ৳60. Outside Dhaka: ৳120. We\'ll call before delivery to confirm.'}
             </p>
           </div>
         </motion.section>
@@ -342,7 +350,54 @@ export default function Checkout() {
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
         >
-          <h2 className="font-headline text-3xl text-white mb-8">DELIVERY DETAILS</h2>
+          <h2 className="font-headline text-3xl text-white mb-8">ORDER DETAILS</h2>
+
+          {/* Fulfillment toggle */}
+          <div className="grid grid-cols-2 gap-3 mb-8">
+            {[
+              { value: 'delivery', icon: 'local_shipping', label: 'Delivery' },
+              { value: 'pickup',   icon: 'storefront',     label: 'Pickup' },
+            ].map(({ value, icon, label }) => (
+              <button
+                key={value}
+                type="button"
+                disabled={loading}
+                onClick={() => { setFulfillment(value); setErrors({}); }}
+                className={`flex items-center justify-center gap-2 py-3 border font-headline text-xl transition-all
+                  ${fulfillment === value
+                    ? 'border-[#ff5500] bg-[#ff5500]/10 text-[#ff5500]'
+                    : 'border-stone-700 text-stone-500 hover:border-stone-500 hover:text-stone-300'}`}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 20, fontVariationSettings: fulfillment === value ? "'FILL' 1" : "'FILL' 0" }}>
+                  {icon}
+                </span>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Pickup location info */}
+          {fulfillment === 'pickup' && (
+            <div className="mb-6 flex items-start gap-3 bg-[#ff5500]/5 border border-[#ff5500]/20 p-4">
+              <span
+                className="material-symbols-outlined text-[#ff5500] flex-shrink-0 mt-0.5"
+                style={{ fontSize: 18, fontVariationSettings: "'FILL' 1" }}
+              >
+                location_on
+              </span>
+              <div>
+                <p className="font-technical text-[10px] text-[#ff5500] uppercase tracking-widest mb-1">
+                  Pickup Location
+                </p>
+                <p className="font-body text-stone-300 text-sm leading-relaxed">
+                  Mirpur DOHS, Dhaka
+                </p>
+                <p className="font-technical text-[10px] text-stone-500 mt-1">
+                  We'll call you to confirm the exact address and a convenient time.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Submit error banner */}
           {submitError && (
@@ -401,43 +456,47 @@ export default function Checkout() {
               />
             </Field>
 
-            <Field label="Delivery Address" required error={errors.address}>
-              <textarea
-                value={form.address}
-                onChange={setField('address')}
-                placeholder="House / Flat no., Road, Area..."
-                rows={3}
-                disabled={loading}
-                className={`${inputClass} resize-none`}
-              />
-            </Field>
+            {fulfillment === 'delivery' && (
+              <>
+                <Field label="Delivery Address" required error={errors.address}>
+                  <textarea
+                    value={form.address}
+                    onChange={setField('address')}
+                    placeholder="House / Flat no., Road, Area..."
+                    rows={3}
+                    disabled={loading}
+                    className={`${inputClass} resize-none`}
+                  />
+                </Field>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <Field label="Area / Thana" required error={errors.area}>
-                <input
-                  type="text"
-                  value={form.area}
-                  onChange={setField('area')}
-                  placeholder="e.g. Gulshan"
-                  disabled={loading}
-                  className={inputClass}
-                />
-              </Field>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <Field label="Area / Thana" required error={errors.area}>
+                    <input
+                      type="text"
+                      value={form.area}
+                      onChange={setField('area')}
+                      placeholder="e.g. Gulshan"
+                      disabled={loading}
+                      className={inputClass}
+                    />
+                  </Field>
 
-              <Field label="District" required error={errors.district}>
-                <select
-                  value={form.district}
-                  onChange={setField('district')}
-                  disabled={loading}
-                  className={`${inputClass} appearance-none cursor-pointer`}
-                >
-                  <option value="" className="bg-[#161616]">Select district</option>
-                  {DISTRICTS.map((d) => (
-                    <option key={d} value={d} className="bg-[#161616]">{d}</option>
-                  ))}
-                </select>
-              </Field>
-            </div>
+                  <Field label="District" required error={errors.district}>
+                    <select
+                      value={form.district}
+                      onChange={setField('district')}
+                      disabled={loading}
+                      className={`${inputClass} appearance-none cursor-pointer`}
+                    >
+                      <option value="" className="bg-[#161616]">Select district</option>
+                      {DISTRICTS.map((d) => (
+                        <option key={d} value={d} className="bg-[#161616]">{d}</option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
+              </>
+            )}
 
             <Field label="Order Notes (optional)">
               <textarea
@@ -485,8 +544,9 @@ export default function Checkout() {
             </button>
 
             <p className="font-technical text-[10px] text-stone-600 text-center uppercase tracking-widest leading-relaxed">
-              Cash on delivery — pay when your order arrives.
-              We'll call to confirm before shipping.
+              {fulfillment === 'pickup'
+                ? "Cash on pickup — pay when you collect your order at Mirpur DOHS."
+                : "Cash on delivery — pay when your order arrives. We'll call to confirm before shipping."}
             </p>
           </form>
         </motion.section>

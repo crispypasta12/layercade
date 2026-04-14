@@ -76,6 +76,7 @@ const DISTRICTS = [
 
 const INITIAL_FORM = {
   fullName: '',
+  email:    '',
   phone:    '',
   address:  '',
   area:     '',
@@ -134,6 +135,9 @@ export default function Checkout() {
     if (!form.fullName.trim()) {
       e.fullName = 'Name is required';
     }
+    if (!form.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      e.email = 'Enter a valid email address';
+    }
     const cleanPhone = form.phone.replace(/[\s-]/g, '');
     if (!/^01[3-9]\d{8}$/.test(cleanPhone)) {
       e.phone = 'Enter a valid BD number (e.g. 01712345678)';
@@ -167,6 +171,7 @@ export default function Checkout() {
       .from('orders')
       .insert([{
         customer_name:  form.fullName.trim(),
+        email:          form.email.trim().toLowerCase(),
         phone:          cleanPhone,
         address:        form.address.trim(),
         area:           form.area.trim(),
@@ -188,6 +193,11 @@ export default function Checkout() {
       );
       return;
     }
+
+    // Fire-and-forget — don't block navigation if email fails
+    supabase.functions.invoke('send-order-confirmation', {
+      body: { order: { ...data, email: form.email.trim().toLowerCase() } },
+    });
 
     navigate('/order-confirmation', {
       state: {
@@ -354,6 +364,22 @@ export default function Checkout() {
                 value={form.fullName}
                 onChange={setField('fullName')}
                 placeholder="Your full name"
+                disabled={loading}
+                className={inputClass}
+              />
+            </Field>
+
+            <Field
+              label="Email Address"
+              required
+              error={errors.email}
+              hint="Order confirmation will be sent here"
+            >
+              <input
+                type="email"
+                value={form.email}
+                onChange={setField('email')}
+                placeholder="you@example.com"
                 disabled={loading}
                 className={inputClass}
               />

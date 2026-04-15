@@ -118,21 +118,42 @@ export async function getRelatedProducts(category, excludeSlug) {
 }
 
 /**
- * Paginated product fetch, optionally filtered by category.
+ * Paginated product fetch, optionally filtered by category, price range, and sort order.
  * Returns { products, total } where total is the full unsliced count.
+ *
+ * sort values: 'featured' | 'price_asc' | 'price_desc' | 'newest' | 'name_asc' | 'name_desc'
  */
-export async function fetchProductsByCategory({ category = null, page = 1, perPage = 12 } = {}) {
+export async function fetchProductsByCategory({
+  category = null,
+  page     = 1,
+  perPage  = 12,
+  sort     = 'featured',
+  priceMin = null,
+  priceMax = null,
+} = {}) {
   const from = (page - 1) * perPage;
   const to   = from + perPage - 1;
 
   let query = supabase
     .from('products')
     .select('*', { count: 'exact' })
-    .order('sort_order', { ascending: true })
     .range(from, to);
 
-  if (category) {
-    query = query.eq('category', category);
+  if (category)        query = query.eq('category', category);
+  if (priceMin !== null) query = query.gte('price', priceMin);
+  if (priceMax !== null) query = query.lte('price', priceMax);
+
+  switch (sort) {
+    case 'price_asc':  query = query.order('price', { ascending: true });  break;
+    case 'price_desc': query = query.order('price', { ascending: false }); break;
+    case 'newest':
+      query = query
+        .order('new_arrival', { ascending: false })
+        .order('sort_order',  { ascending: true });
+      break;
+    case 'name_asc':   query = query.order('name', { ascending: true });   break;
+    case 'name_desc':  query = query.order('name', { ascending: false });  break;
+    default:           query = query.order('sort_order', { ascending: true }); // 'featured'
   }
 
   const { data, error, count } = await query;
@@ -146,6 +167,28 @@ export async function fetchProductsByCategory({ category = null, page = 1, perPa
     products: (data ?? []).map(toProduct),
     total: count ?? 0,
   };
+}
+
+/**
+ * Full-text search across name, category, and description.
+ * Returns up to `limit` results ordered by sort_order.
+ */
+export async function searchProducts(query, limit = 8) {
+  const q = query.trim();
+  if (!q) return [];
+
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .or(`name.ilike.%${q}%,category.ilike.%${q}%,description.ilike.%${q}%`)
+    .order('sort_order', { ascending: true })
+    .limit(limit);
+
+  if (error) {
+    console.error('[products] searchProducts error:', error.message);
+    return [];
+  }
+  return (data ?? []).map(toProduct);
 }
 
 /** Single product by slug, or null if not found */

@@ -134,7 +134,7 @@ serve(async (req) => {
         </tr>
 
       </table>
-    </td></tr>
+    </td></tr>new row violates row-level security policy for table "orders"
   </table>
 </body>
 </html>`;

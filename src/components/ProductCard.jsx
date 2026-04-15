@@ -45,6 +45,11 @@ export default function ProductCard({ product, location }) {
           NEW
         </div>
       )}
+      {product.stock_status === 'low_stock' && (
+        <div className="absolute top-4 right-0 z-20 border border-yellow-700/60 bg-yellow-950/80 text-yellow-300 px-3 py-1 font-technical text-[10px] uppercase tracking-widest">
+          Low Stock
+        </div>
+      )}
 
       {/* Clickable product area */}
       <Link

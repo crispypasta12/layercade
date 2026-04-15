@@ -2,8 +2,10 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 
 const NAV_LINKS = [
-  { label: 'Orders',   to: '/admin/orders' },
-  { label: 'Products', to: '/admin/products' },
+  { label: 'Dashboard',  to: '/admin',            end: true },
+  { label: 'Orders',     to: '/admin/orders' },
+  { label: 'Products',   to: '/admin/products' },
+  { label: 'Categories', to: '/admin/categories' },
 ];
 
 export default function AdminNavbar() {
@@ -31,10 +33,11 @@ export default function AdminNavbar() {
         </div>
 
         <nav className="flex items-center gap-1">
-          {NAV_LINKS.map(({ label, to }) => (
+          {NAV_LINKS.map(({ label, to, end }) => (
             <NavLink
               key={to}
               to={to}
+              end={end}
               className={({ isActive }) =>
                 `font-technical text-xs uppercase tracking-widest px-3 py-1.5 transition-colors ${
                   isActive

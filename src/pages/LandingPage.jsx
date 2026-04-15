@@ -4,11 +4,11 @@ import { motion } from 'framer-motion';
 import { getFeaturedProducts, getNewArrivals } from '../data/products';
 import { FloatingPaths } from '@/components/ui/background-paths';
 import ProductCard, { fadeUp } from '../components/ProductCard';
-import { CATEGORIES } from '../lib/categories';
+import { useCategories } from '../lib/useCategories';
 import ParallaxSection from '@/components/ui/parallax-section';
 
 /* ─── Constants ──────────────────────────────────────────────── */
-const TW_WORDS = ['PLA', 'PETG', 'TPU', 'RESIN', 'ASA', 'FLEX'];
+const TW_WORDS = ['PLA', 'PETG', 'TPU', 'RESIN', 'ASA AERO', 'FLEX'];
 
 
 const REVIEWS = [
@@ -59,6 +59,7 @@ const stagger = {
 
 export default function LandingPage() {
   const location = useLocation();
+  const { categories: allCategories } = useCategories();
 
   /* Typewriter */
   const [twText,    setTwText]    = useState('');
@@ -239,16 +240,28 @@ export default function LandingPage() {
             whileInView="show"
             viewport={{ once: true, margin: '-80px' }}
           >
-            {CATEGORIES.map((cat, i) => (
+            {allCategories.map((cat, i) => (
               <motion.div
                 key={cat.slug}
                 variants={fadeUp}
                 transition={{ duration: 0.4 }}
                 className="group flex-shrink-0 w-[260px] h-[340px] relative overflow-hidden border border-white/5 hover-glow bg-[#161616]"
               >
+                {/* Background image (optional) */}
+                {cat.image_url && (
+                  <>
+                    <img
+                      src={cat.image_url}
+                      alt={cat.name}
+                      className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/20" />
+                  </>
+                )}
+
                 <Link to={`/shop/${cat.slug}`} className="absolute inset-0 overflow-hidden p-7 flex flex-col justify-between">
                   <div className="flex justify-between items-start">
-                    <span className="font-technical text-stone-600 text-xs">
+                    <span className={`font-technical text-xs ${cat.image_url ? 'text-white/40' : 'text-stone-600'}`}>
                       {String(i + 1).padStart(2, '0')}
                     </span>
                     <span className="material-symbols-outlined text-[#ff5500] text-base opacity-0 group-hover:opacity-100 transition-opacity duration-200">
@@ -274,7 +287,7 @@ export default function LandingPage() {
               <Link to="/quote" className="absolute inset-0 overflow-hidden p-7 flex flex-col justify-between">
                 <div className="flex justify-between items-start">
                   <span className="font-technical text-black/50 text-xs">
-                    {String(CATEGORIES.length + 1).padStart(2, '0')}
+                    {String(allCategories.length + 1).padStart(2, '0')}
                   </span>
                   <span className="material-symbols-outlined text-black text-base">
                     arrow_outward

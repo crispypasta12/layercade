@@ -2,23 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { parseProductImages } from '../../lib/productImages';
 import { supabase } from '../../lib/supabase';
-
-const CATEGORIES = [
-  'Gaming Accessories',
-  'Headphone Stands',
-  'Busts',
-  'Masks',
-  'Diorama',
-  'Keycap',
-  'Flower Vases',
-  'Desk Accessories',
-  'Pegboard Accessories',
-  'Room Decor',
-  'Collectibles',
-  'Headphone Gear',
-  'Sculptures',
-  'Custom',
-];
+import { useCategories } from '../../lib/useCategories';
 
 const STOCK_OPTIONS = [
   { value: 'in_stock', label: 'In Stock' },
@@ -67,12 +51,13 @@ function Field({ label, error, children }) {
 export default function ProductFormModal({ product, onClose, onSuccess }) {
   const isEdit = product !== null;
   const initialImages = parseProductImages(product?.image, product?.images);
+  const { categories } = useCategories();
 
   const [name, setName] = useState(product?.name ?? '');
   const [slug, setSlug] = useState(product?.slug ?? '');
   const [description, setDescription] = useState(product?.description ?? '');
   const [price, setPrice] = useState(product?.price != null ? String(product.price) : '');
-  const [category, setCategory] = useState(product?.category ?? CATEGORIES[0]);
+  const [category, setCategory] = useState(product?.category ?? '');
   const [stockStatus, setStockStatus] = useState(product?.stock_status ?? 'in_stock');
   const [featured, setFeatured] = useState(product?.featured ?? false);
   const [newArrival, setNewArrival] = useState(product?.new_arrival ?? false);
@@ -375,8 +360,8 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
                   disabled={isFormLocked}
                   className={inputClass + ' appearance-none cursor-pointer pr-8'}
                 >
-                  {CATEGORIES.map((c) => (
-                    <option key={c} value={c} className="bg-[#161616]">{c}</option>
+                  {categories.map((c) => (
+                    <option key={c.name} value={c.name} className="bg-[#161616]">{c.name}</option>
                   ))}
                 </select>
                 <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-stone-500" style={{ fontSize: 16 }}>expand_more</span>

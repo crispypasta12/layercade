@@ -234,11 +234,33 @@ export default function OrderDetailModal({ order, onClose, onUpdated, onDeleted 
               <div className="bg-[#161616] border border-white/5 p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <InfoRow icon="person"      label="Name"     value={order.customer_name ?? '—'} />
                 <InfoRow icon="phone"       label="Phone"    value={order.phone ?? '—'} mono />
-                <InfoRow icon="location_on" label="District" value={order.district ?? '—'} />
-                <InfoRow icon="map"         label="Area"     value={order.area ?? '—'} />
                 <div className="sm:col-span-2">
-                  <InfoRow icon="home" label="Address" value={order.address ?? '—'} />
+                  <p className="font-technical text-[10px] text-stone-600 uppercase tracking-widest mb-1">Fulfillment</p>
+                  {order.fulfillment_type === 'pickup' ? (
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 text-[10px] font-technical uppercase tracking-widest bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                        <span className="material-symbols-outlined" style={{ fontSize: 13, fontVariationSettings: "'FILL' 1" }}>storefront</span>
+                        Pickup — Mirpur DOHS, Dhaka
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 text-[10px] font-technical uppercase tracking-widest bg-stone-800 text-stone-400 border border-white/10">
+                        <span className="material-symbols-outlined" style={{ fontSize: 13, fontVariationSettings: "'FILL' 1" }}>local_shipping</span>
+                        Home Delivery
+                      </span>
+                    </div>
+                  )}
                 </div>
+                {order.fulfillment_type !== 'pickup' && (
+                  <>
+                    <InfoRow icon="location_on" label="District" value={order.district ?? '—'} />
+                    <InfoRow icon="map"         label="Area"     value={order.area ?? '—'} />
+                    <div className="sm:col-span-2">
+                      <InfoRow icon="home" label="Address" value={order.address ?? '—'} />
+                    </div>
+                  </>
+                )}
               </div>
             </section>
 

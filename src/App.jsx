@@ -17,8 +17,10 @@ import ShopPage          from './pages/ShopPage';
 import Checkout           from './pages/Checkout';
 import OrderConfirmation  from './pages/OrderConfirmation';
 import AdminLogin         from './pages/admin/Login';
+import AdminDashboard     from './pages/admin/Dashboard';
 import AdminOrders        from './pages/admin/Orders';
 import AdminProducts      from './pages/admin/Products';
+import AdminCategories    from './pages/admin/Categories';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -72,6 +74,14 @@ export default function App() {
         {/* Admin routes — no site chrome */}
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/admin/orders"
           element={
             <ProtectedRoute>
@@ -84,6 +94,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <AdminProducts />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/categories"
+          element={
+            <ProtectedRoute>
+              <AdminCategories />
             </ProtectedRoute>
           }
         />

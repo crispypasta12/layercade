@@ -8,6 +8,13 @@ import OrderDetailModal from '../../components/admin/OrderDetailModal';
 
 const PAGE_SIZE = 20;
 
+// Linear workflow: pending → confirmed → shipped → delivered
+const NEXT_STATUS = {
+  pending:   'confirmed',
+  confirmed: 'shipped',
+  shipped:   'delivered',
+};
+
 const STATUS_OPTIONS = [
   { value: 'all',       label: 'All Statuses' },
   { value: 'pending',   label: 'Pending' },
@@ -77,6 +84,9 @@ export default function AdminOrders() {
   // Pagination
   const [page, setPage] = useState(0);
 
+  // IDs of orders currently being advanced (for inline spinner)
+  const [advancingIds, setAdvancingIds] = useState(new Set());
+
   /* ── Debounce search input ─────────────────────────────────── */
   useEffect(() => {
     const id = setTimeout(() => {
@@ -137,14 +147,42 @@ export default function AdminOrders() {
     setPage(0);
   };
 
+  /* ── Quick-advance status ─────────────────────────────────────── */
+  const handleAdvance = async (order) => {
+    const next = NEXT_STATUS[order.status];
+    if (!next) return;
+
+    setAdvancingIds((prev) => new Set(prev).add(order.id));
+
+    const { data, error } = await supabase
+      .from('orders')
+      .update({ status: next })
+      .eq('id', order.id)
+      .select()
+      .single();
+
+    setAdvancingIds((prev) => {
+      const s = new Set(prev);
+      s.delete(order.id);
+      return s;
+    });
+
+    if (!error && data) {
+      setOrders((prev) => prev.map((o) => (o.id === data.id ? data : o)));
+      // Sync the detail modal if this order is open
+      if (selectedOrder?.id === data.id) setSelectedOrder(data);
+    }
+  };
+
   /* ── CSV Export ─────────────────────────────────────────────── */
   const exportCSV = () => {
-    const headers = ['Order ID', 'Date', 'Customer', 'Phone', 'District', 'Items', 'Total (৳)', 'Status'];
+    const headers = ['Order ID', 'Date', 'Customer', 'Phone', 'Fulfillment', 'District', 'Items', 'Total (৳)', 'Status'];
     const rows = filtered.map((o) => [
       `ORD-${o.id}`,
       formatDate(o.created_at),
       o.customer_name ?? '',
       o.phone ?? '',
+      o.fulfillment_type ?? 'delivery',
       o.district ?? '',
       Array.isArray(o.items) ? o.items.reduce((s, i) => s + (i.quantity ?? 1), 0) : 0,
       o.total_amount ?? 0,
@@ -281,7 +319,7 @@ export default function AdminOrders() {
             <table className="w-full min-w-[900px] text-sm border-collapse">
               <thead>
                 <tr className="border-b border-white/10">
-                  {['Order ID', 'Date', 'Customer', 'Phone', 'District', 'Items', 'Total', 'Status', ''].map((h) => (
+                  {['Order ID', 'Date', 'Customer', 'Phone', 'Fulfillment', 'District', 'Items', 'Total', 'Status', 'Advance', ''].map((h) => (
                     <th
                       key={h}
                       className="text-left font-technical text-[10px] text-stone-500 uppercase tracking-widest
@@ -295,7 +333,7 @@ export default function AdminOrders() {
               <tbody>
                 {paginated.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="text-center font-body text-stone-600 py-16">
+                    <td colSpan={10} className="text-center font-body text-stone-600 py-16">
                       No orders found.
                     </td>
                   </tr>
@@ -326,6 +364,19 @@ export default function AdminOrders() {
                         <td className="py-3 px-4 font-technical text-stone-400 text-xs whitespace-nowrap">
                           {order.phone ?? '—'}
                         </td>
+                        <td className="py-3 px-4">
+                          {order.fulfillment_type === 'pickup' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-technical uppercase tracking-widest bg-blue-500/20 text-blue-400">
+                              <span className="material-symbols-outlined" style={{ fontSize: 11, fontVariationSettings: "'FILL' 1" }}>storefront</span>
+                              Pickup
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-technical uppercase tracking-widest bg-stone-800 text-stone-400">
+                              <span className="material-symbols-outlined" style={{ fontSize: 11, fontVariationSettings: "'FILL' 1" }}>local_shipping</span>
+                              Delivery
+                            </span>
+                          )}
+                        </td>
                         <td className="py-3 px-4 font-body text-stone-300 text-sm">
                           {order.district ?? '—'}
                         </td>
@@ -338,6 +389,32 @@ export default function AdminOrders() {
                         </td>
                         <td className="py-3 px-4">
                           <StatusBadge status={order.status} />
+                        </td>
+                        <td className="py-3 px-4">
+                          {NEXT_STATUS[order.status] ? (
+                            <button
+                              onClick={() => handleAdvance(order)}
+                              disabled={advancingIds.has(order.id)}
+                              className="flex items-center gap-1.5 font-technical text-[10px] uppercase
+                                         tracking-widest px-3 py-1.5 border transition-colors whitespace-nowrap
+                                         border-[#ff5500]/30 text-[#ff5500] hover:bg-[#ff5500]/10
+                                         disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                              {advancingIds.has(order.id) ? (
+                                <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                                </svg>
+                              ) : (
+                                <span className="material-symbols-outlined" style={{ fontSize: 11 }}>arrow_forward</span>
+                              )}
+                              {STATUS_COLORS[NEXT_STATUS[order.status]]?.label}
+                            </button>
+                          ) : (
+                            <span className="font-technical text-[10px] text-stone-700 uppercase tracking-widest">
+                              —
+                            </span>
+                          )}
                         </td>
                         <td className="py-3 px-4">
                           <button

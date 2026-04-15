@@ -6,26 +6,7 @@ import AdminNavbar from '../../components/admin/AdminNavbar';
 import ProductFormModal from '../../components/admin/ProductFormModal';
 import DeleteConfirmModal from '../../components/admin/DeleteConfirmModal';
 import Toast from '../../components/Toast';
-
-/* ─── Constants ──────────────────────────────────────────────────── */
-
-const CATEGORIES = [
-  'All Categories',
-  'Gaming Accessories',
-  'Headphone Stands',
-  'Busts',
-  'Masks',
-  'Diorama',
-  'Keycap',
-  'Flower Vases',
-  'Desk Accessories',
-  'Pegboard Accessories',
-  'Room Decor',
-  'Collectibles',
-  'Headphone Gear',
-  'Sculptures',
-  'Custom',
-];
+import { useCategories } from '../../lib/useCategories';
 
 const STOCK_OPTIONS = [
   { value: 'all',          label: 'All Stock' },
@@ -77,6 +58,8 @@ function StatCard({ icon, label, value, accent }) {
 /* ─── Main component ─────────────────────────────────────────────── */
 
 export default function AdminProducts() {
+  const { categories } = useCategories();
+
   const [products,   setProducts]   = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState(null);
@@ -260,8 +243,9 @@ export default function AdminProducts() {
               className={selectClass + ' w-full sm:w-auto'}
               style={{ paddingRight: '2rem' }}
             >
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c} className="bg-[#161616]">{c}</option>
+              <option value="All Categories" className="bg-[#161616]">All Categories</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.name} className="bg-[#161616]">{c.name}</option>
               ))}
             </select>
             <span

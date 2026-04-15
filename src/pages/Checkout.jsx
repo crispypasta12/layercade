@@ -171,44 +171,49 @@ export default function Checkout() {
 
     const cleanPhone = form.phone.replace(/[\s-]/g, '');
 
-    const { data, error } = await supabase
-      .from('orders')
-      .insert([{
-        customer_name:    form.fullName.trim(),
-        email:            form.email.trim().toLowerCase(),
-        phone:            cleanPhone,
-        fulfillment_type: fulfillment,
-        address:          fulfillment === 'delivery' ? form.address.trim() : null,
-        area:             fulfillment === 'delivery' ? form.area.trim()    : null,
-        district:         fulfillment === 'delivery' ? form.district        : null,
-        items:            items,
-        total_amount:     grandTotal,
-        delivery_fee:     deliveryFee,
-        payment_method:   'cod',
-        notes:            form.notes.trim() || null,
-      }])
-      .select()
-      .single();
+    const { data: orderId, error } = await supabase.rpc('place_order', {
+      p_customer_name:    form.fullName.trim(),
+      p_email:            form.email.trim().toLowerCase(),
+      p_phone:            cleanPhone,
+      p_fulfillment_type: fulfillment,
+      p_address:          fulfillment === 'delivery' ? form.address.trim() : null,
+      p_area:             fulfillment === 'delivery' ? form.area.trim()    : null,
+      p_district:         fulfillment === 'delivery' ? form.district        : null,
+      p_items:            items,
+      p_total_amount:     grandTotal,
+      p_delivery_fee:     deliveryFee,
+      p_notes:            form.notes.trim() || null,
+    });
 
     setLoading(false);
 
     if (error) {
-      setSubmitError(
-        'Something went wrong placing your order. Please check your connection and try again.'
-      );
+      setSubmitError('Something went wrong placing your order. Please check your connection and try again.');
       return;
     }
 
     // Fire-and-forget — don't block navigation if email fails
     supabase.functions.invoke('send-order-confirmation', {
-      body: { order: { ...data, email: form.email.trim().toLowerCase() } },
+      body: {
+        order: {
+          id:            orderId,
+          customer_name: form.fullName.trim(),
+          email:         form.email.trim().toLowerCase(),
+          items,
+          total_amount:  grandTotal,
+          delivery_fee:  deliveryFee,
+          address:       form.address.trim(),
+          area:          form.area.trim(),
+          district:      form.district,
+        },
+      },
     });
 
     navigate('/order-confirmation', {
       state: {
-        orderId:      data.id,
-        customerName: data.customer_name,
-        totalAmount:  data.total_amount,
+        orderId,
+        customerName: form.fullName.trim(),
+        totalAmount:  grandTotal,
       },
     });
   };

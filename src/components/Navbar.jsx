@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, NavLink } from 'react-router-dom';
+import { AnimatePresence } from 'framer-motion';
 import { useCartStore } from '../store/cartStore';
 import CartDrawer from './CartDrawer';
+import SearchOverlay from './SearchOverlay';
 import { supabase } from '../lib/supabase';
 
 const navLinks = [
@@ -15,6 +17,7 @@ const navLinks = [
 export default function Navbar() {
   const [scrolled,       setScrolled]       = useState(false);
   const [menuOpen,       setMenuOpen]       = useState(false);
+  const [searchOpen,     setSearchOpen]     = useState(false);
   const [logoClicks,     setLogoClicks]     = useState(0);
   const [adminVisible,   setAdminVisible]   = useState(false);
   const [pendingCount,   setPendingCount]   = useState(0);
@@ -33,6 +36,19 @@ export default function Navbar() {
     const onResize = () => { if (window.innerWidth >= 768) setMenuOpen(false); };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // Ctrl+K / Cmd+K opens search
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setSearchOpen(true);
+        setMenuOpen(false);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, []);
 
   // Fetch pending order count once admin link is revealed
@@ -151,6 +167,20 @@ export default function Navbar() {
           </Link>
         )}
 
+        {/* Search icon */}
+        <button
+          onClick={() => { setSearchOpen(true); setMenuOpen(false); }}
+          aria-label="Search products"
+          className="relative flex items-center justify-center text-stone-400 hover:text-white transition-colors p-1 group"
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 24 }}>search</span>
+          <span className="hidden md:flex absolute -bottom-5 left-1/2 -translate-x-1/2
+                           font-technical text-[8px] text-stone-600 whitespace-nowrap
+                           group-hover:text-stone-400 transition-colors">
+            ⌘K
+          </span>
+        </button>
+
         {/* Cart icon */}
         <button
           onClick={openCart}
@@ -234,6 +264,9 @@ export default function Navbar() {
       </div>
     </nav>
     <CartDrawer />
+    <AnimatePresence>
+      {searchOpen && <SearchOverlay onClose={() => setSearchOpen(false)} />}
+    </AnimatePresence>
     </>
   );
 }

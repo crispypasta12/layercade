@@ -6,6 +6,8 @@ const NAV_LINKS = [
   { label: 'Orders',     to: '/admin/orders' },
   { label: 'Products',   to: '/admin/products' },
   { label: 'Categories', to: '/admin/categories' },
+  { label: 'Calculator', to: '/admin/calculator' },
+  { label: 'Invoices',   to: '/admin/invoices' },
 ];
 
 export default function AdminNavbar() {

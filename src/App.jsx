@@ -21,6 +21,8 @@ import AdminDashboard     from './pages/admin/Dashboard';
 import AdminOrders        from './pages/admin/Orders';
 import AdminProducts      from './pages/admin/Products';
 import AdminCategories    from './pages/admin/Categories';
+import CostCalculator    from './pages/admin/CostCalculator';
+import InvoiceMaker     from './pages/admin/InvoiceMaker';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -102,6 +104,22 @@ export default function App() {
           element={
             <ProtectedRoute>
               <AdminCategories />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/calculator"
+          element={
+            <ProtectedRoute>
+              <CostCalculator />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/invoices"
+          element={
+            <ProtectedRoute>
+              <InvoiceMaker />
             </ProtectedRoute>
           }
         />

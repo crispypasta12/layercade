@@ -18,6 +18,8 @@ const QUICK_LINKS = [
   { label: 'Manage Orders',     to: '/admin/orders',     icon: 'receipt_long' },
   { label: 'Manage Products',   to: '/admin/products',   icon: 'inventory_2' },
   { label: 'Manage Categories', to: '/admin/categories', icon: 'category' },
+  { label: 'Cost Calculator',   to: '/admin/calculator', icon: 'calculate' },
+  { label: 'Invoice Maker',     to: '/admin/invoices',   icon: 'receipt_long' },
 ];
 
 /* ─── Helpers ────────────────────────────────────────────────────── */

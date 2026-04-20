@@ -162,10 +162,10 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-[#080808] text-white">
       <AdminNavbar />
 
-      <div className="px-6 py-8 max-w-screen-2xl mx-auto space-y-8">
+      <div className="px-4 md:px-6 py-6 md:py-8 max-w-screen-2xl mx-auto space-y-6 md:space-y-8">
 
         {/* ── Header ───────────────────────────────────────────────── */}
-        <div className="flex items-end justify-between gap-4">
+        <div className="flex items-start sm:items-end justify-between gap-3 flex-wrap">
           <div>
             <h1
               className="uppercase tracking-tight text-white"
@@ -265,56 +265,96 @@ export default function AdminDashboard() {
                   </p>
                 </div>
               ) : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-white/10">
-                      {['Order', 'Customer', 'Amount', 'Status', 'Date'].map((h) => (
-                        <th
-                          key={h}
-                          className="text-left font-technical text-[10px] text-stone-500
-                                     uppercase tracking-widest py-3 px-5 whitespace-nowrap"
-                        >
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
+                <>
+                  {/* Mobile cards */}
+                  <div className="md:hidden divide-y divide-white/5">
                     {recentOrders.map((order, idx) => (
-                      <motion.tr
+                      <motion.div
                         key={order.id}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         transition={{ duration: 0.2, delay: idx * 0.03 }}
-                        className={`border-b border-white/5 hover:bg-white/[0.02] transition-colors ${
-                          idx % 2 === 0 ? 'bg-[#111111]' : 'bg-[#161616]/50'
-                        }`}
+                        className="px-4 py-3 space-y-1.5"
                       >
-                        <td
-                          className="py-3 px-5 font-mono text-[#ff5500] text-xs whitespace-nowrap"
-                          style={{ fontFamily: "'Space Mono', monospace" }}
-                        >
-                          #ORD-{order.id}
-                        </td>
-                        <td className="py-3 px-5 text-stone-300 font-body whitespace-nowrap">
-                          {order.customer_name ?? '—'}
-                        </td>
-                        <td
-                          className="py-3 px-5 text-white text-xs whitespace-nowrap"
-                          style={{ fontFamily: "'Space Mono', monospace" }}
-                        >
-                          ৳{(order.total_amount ?? 0).toLocaleString('en-IN')}
-                        </td>
-                        <td className="py-3 px-5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span
+                            className="font-mono text-[#ff5500] text-xs"
+                            style={{ fontFamily: "'Space Mono', monospace" }}
+                          >
+                            #ORD-{order.id}
+                          </span>
                           <StatusBadge status={order.status} />
-                        </td>
-                        <td className="py-3 px-5 font-technical text-stone-600 text-[10px] whitespace-nowrap uppercase tracking-wider">
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-body text-stone-300 text-sm truncate">
+                            {order.customer_name ?? '—'}
+                          </span>
+                          <span
+                            className="font-mono text-white text-xs whitespace-nowrap"
+                            style={{ fontFamily: "'Space Mono', monospace" }}
+                          >
+                            ৳{(order.total_amount ?? 0).toLocaleString('en-IN')}
+                          </span>
+                        </div>
+                        <p className="font-technical text-[10px] text-stone-600 uppercase tracking-wider">
                           {formatDate(order.created_at)}
-                        </td>
-                      </motion.tr>
+                        </p>
+                      </motion.div>
                     ))}
-                  </tbody>
-                </table>
+                  </div>
+
+                  {/* Desktop table */}
+                  <table className="hidden md:table w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-white/10">
+                        {['Order', 'Customer', 'Amount', 'Status', 'Date'].map((h) => (
+                          <th
+                            key={h}
+                            className="text-left font-technical text-[10px] text-stone-500
+                                       uppercase tracking-widest py-3 px-5 whitespace-nowrap"
+                          >
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recentOrders.map((order, idx) => (
+                        <motion.tr
+                          key={order.id}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ duration: 0.2, delay: idx * 0.03 }}
+                          className={`border-b border-white/5 hover:bg-white/[0.02] transition-colors ${
+                            idx % 2 === 0 ? 'bg-[#111111]' : 'bg-[#161616]/50'
+                          }`}
+                        >
+                          <td
+                            className="py-3 px-5 font-mono text-[#ff5500] text-xs whitespace-nowrap"
+                            style={{ fontFamily: "'Space Mono', monospace" }}
+                          >
+                            #ORD-{order.id}
+                          </td>
+                          <td className="py-3 px-5 text-stone-300 font-body whitespace-nowrap">
+                            {order.customer_name ?? '—'}
+                          </td>
+                          <td
+                            className="py-3 px-5 text-white text-xs whitespace-nowrap"
+                            style={{ fontFamily: "'Space Mono', monospace" }}
+                          >
+                            ৳{(order.total_amount ?? 0).toLocaleString('en-IN')}
+                          </td>
+                          <td className="py-3 px-5">
+                            <StatusBadge status={order.status} />
+                          </td>
+                          <td className="py-3 px-5 font-technical text-stone-600 text-[10px] whitespace-nowrap uppercase tracking-wider">
+                            {formatDate(order.created_at)}
+                          </td>
+                        </motion.tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
               )}
             </div>
           </div>

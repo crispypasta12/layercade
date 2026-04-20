@@ -42,10 +42,10 @@ function CategoryBadge({ category }) {
 
 function StatCard({ icon, label, value, accent }) {
   return (
-    <div className="bg-[#111111] border border-white/10 p-6 flex flex-col gap-2">
+    <div className="bg-[#111111] border border-white/10 p-4 md:p-6 flex flex-col gap-1.5 md:gap-2">
       <span className="material-symbols-outlined text-stone-500" style={{ fontSize: 22 }}>{icon}</span>
       <span
-        className="font-headline text-3xl"
+        className="font-headline text-2xl md:text-3xl"
         style={{ color: accent ? '#ff5500' : '#ffffff', fontFamily: "'Bebas Neue', sans-serif" }}
       >
         {value}
@@ -202,13 +202,13 @@ export default function AdminProducts() {
     <div className="min-h-screen bg-[#080808] text-white">
       <AdminNavbar />
 
-      <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
+      <div className="max-w-7xl mx-auto px-4 py-6 md:py-8 space-y-6 md:space-y-8">
 
         {/* ── Page header ─────────────────────────────────────────── */}
         <div className="flex items-center justify-between gap-4">
           <h1
             className="uppercase tracking-tight text-white"
-            style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '3rem', lineHeight: 1 }}
+            style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 'clamp(2rem, 6vw, 3rem)', lineHeight: 1 }}
           >
             Products
           </h1>
@@ -216,17 +216,18 @@ export default function AdminProducts() {
             onClick={handleAddProduct}
             disabled={loading}
             className="clip-parallelogram bg-[#ff5500] text-white font-technical text-xs uppercase
-                       tracking-widest px-8 py-3 flex items-center gap-2
+                       tracking-widest px-5 sm:px-8 py-3 flex items-center gap-2
                        hover:shadow-[0_0_20px_rgba(255,85,0,0.3)] transition-all
-                       disabled:opacity-50 disabled:cursor-not-allowed"
+                       disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
           >
             <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add</span>
-            Add New Product
+            <span className="hidden sm:inline">Add New Product</span>
+            <span className="sm:hidden">Add</span>
           </button>
         </div>
 
         {/* ── Stats cards ─────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           <StatCard icon="inventory_2"  label="Total Products"      value={totalProducts}                           />
           <StatCard icon="star"         label="Featured Products"    value={featuredCount}      accent               />
           <StatCard icon="remove_shopping_cart" label="Out of Stock" value={outOfStockCount}                        />
@@ -319,7 +320,7 @@ export default function AdminProducts() {
         {/* ── Products grid ────────────────────────────────────────── */}
         {loading ? (
           /* Skeleton loaders */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="bg-[#111111] border border-white/10 animate-pulse">
                 <div className="aspect-square bg-white/5" />
@@ -361,7 +362,7 @@ export default function AdminProducts() {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
             {filtered.map((product, idx) => (
               <motion.div
                 key={product.id}
@@ -381,10 +382,10 @@ export default function AdminProducts() {
                 </div>
 
                 {/* Info */}
-                <div className="p-4 flex flex-col gap-3 flex-1">
+                <div className="p-3 md:p-4 flex flex-col gap-2 md:gap-3 flex-1">
                   {/* Name */}
                   <h3
-                    className="text-white text-xl leading-tight line-clamp-1"
+                    className="text-white text-base md:text-xl leading-tight line-clamp-2"
                     style={{ fontFamily: "'Bebas Neue', sans-serif" }}
                   >
                     {product.name}

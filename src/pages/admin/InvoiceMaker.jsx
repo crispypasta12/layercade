@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import AdminNavbar from '../../components/admin/AdminNavbar';
+import { fetchProducts } from '../../data/products';
 
 /* ─── Storage helpers ────────────────────────────────────────────── */
 
@@ -164,9 +165,72 @@ function InvoiceListItem({ inv, isActive, onClick, onDelete }) {
   );
 }
 
+/* ─── Description input with product suggestions ─────────────────── */
+
+function DescriptionInput({ value, onChange, products }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState(value);
+  const containerRef = useRef(null);
+
+  // Keep query in sync when parent resets value
+  useEffect(() => { setQuery(value); }, [value]);
+
+  // Close on outside click
+  useEffect(() => {
+    function handle(e) {
+      if (containerRef.current && !containerRef.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, []);
+
+  const filtered = query.trim()
+    ? products.filter((p) => p.name.toLowerCase().includes(query.trim().toLowerCase()))
+    : products;
+
+  const select = (name) => {
+    setQuery(name);
+    onChange(name);
+    setOpen(false);
+  };
+
+  return (
+    <div ref={containerRef} className="relative">
+      <input
+        type="text"
+        value={query}
+        placeholder="Item description…"
+        className="w-full bg-[#0a0a0a] border border-white/10 text-white text-sm px-3 py-2
+                   focus:outline-none focus:border-[#ff5500]/60 transition-colors placeholder-stone-700"
+        onChange={(e) => { setQuery(e.target.value); onChange(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+      />
+      {open && filtered.length > 0 && (
+        <div className="absolute left-0 right-0 top-full z-50 bg-[#111111] border border-white/10 border-t-0 max-h-44 overflow-y-auto shadow-lg">
+          {filtered.map((p) => (
+            <button
+              key={p.id}
+              onMouseDown={(e) => { e.preventDefault(); select(p.name); }}
+              className="w-full text-left px-3 py-2 flex items-center gap-3 hover:bg-[#ff5500]/10 transition-colors group"
+            >
+              {p.img1 && (
+                <img src={p.img1} alt="" className="w-6 h-6 object-cover flex-shrink-0 opacity-70 group-hover:opacity-100" />
+              )}
+              <span className="text-sm text-stone-300 group-hover:text-white truncate">{p.name}</span>
+              <span className="ml-auto font-mono text-[11px] text-stone-600 flex-shrink-0" style={{ fontFamily: "'Space Mono', monospace" }}>
+                {p.price ? `৳${Number(p.price).toLocaleString('en-IN')}` : ''}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─── Line items editor ──────────────────────────────────────────── */
 
-function LineItemsEditor({ items, onChange, currency }) {
+function LineItemsEditor({ items, onChange, currency, products }) {
   const updateItem = (idx, key, val) => {
     onChange(items.map((it, i) => i === idx ? { ...it, [key]: val } : it));
   };
@@ -189,13 +253,10 @@ function LineItemsEditor({ items, onChange, currency }) {
         return (
           <div key={it.id} className="grid grid-cols-12 gap-2 items-center">
             <div className="col-span-6">
-              <input
-                type="text"
+              <DescriptionInput
                 value={it.description}
-                onChange={(e) => updateItem(idx, 'description', e.target.value)}
-                placeholder="Item description…"
-                className="w-full bg-[#0a0a0a] border border-white/10 text-white text-sm px-3 py-2
-                           focus:outline-none focus:border-[#ff5500]/60 transition-colors placeholder-stone-700"
+                onChange={(v) => updateItem(idx, 'description', v)}
+                products={products}
               />
             </div>
             <div className="col-span-2">
@@ -440,7 +501,7 @@ function InvoiceTemplate({ inv, business }) {
 
 /* ─── Editor panel ───────────────────────────────────────────────── */
 
-function InvoiceEditor({ invoice, onChange, business }) {
+function InvoiceEditor({ invoice, onChange, business, products }) {
   const upd = (key, val) => onChange({ ...invoice, [key]: val });
 
   return (
@@ -448,34 +509,36 @@ function InvoiceEditor({ invoice, onChange, business }) {
       {/* Header row */}
       <Card>
         <SectionTitle>Invoice Details</SectionTitle>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <Field label="Invoice ID">
-            <Input value={invoice.id} onChange={(v) => upd('id', v)} placeholder="INV-001" />
-          </Field>
-          <Field label="Status">
-            <select
-              value={invoice.status}
-              onChange={(e) => upd('status', e.target.value)}
-              className="w-full bg-[#0a0a0a] border border-white/10 text-white text-sm px-3 py-2
-                         focus:outline-none focus:border-[#ff5500]/60 transition-colors"
-            >
-              {Object.entries(STATUS_META).map(([k, v]) => (
-                <option key={k} value={k}>{v.label}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Currency">
-            <select
-              value={invoice.currency}
-              onChange={(e) => upd('currency', e.target.value)}
-              className="w-full bg-[#0a0a0a] border border-white/10 text-white text-sm px-3 py-2
-                         focus:outline-none focus:border-[#ff5500]/60 transition-colors"
-            >
-              <option value="BDT">BDT (৳)</option>
-              <option value="USD">USD ($)</option>
-            </select>
-          </Field>
-          <div className="grid grid-cols-2 gap-2 col-span-2 sm:col-span-1">
+        <div className="space-y-4">
+          <div className="grid grid-cols-3 gap-4">
+            <Field label="Invoice ID">
+              <Input value={invoice.id} onChange={(v) => upd('id', v)} placeholder="INV-001" />
+            </Field>
+            <Field label="Status">
+              <select
+                value={invoice.status}
+                onChange={(e) => upd('status', e.target.value)}
+                className="w-full bg-[#0a0a0a] border border-white/10 text-white text-sm px-3 py-2
+                           focus:outline-none focus:border-[#ff5500]/60 transition-colors"
+              >
+                {Object.entries(STATUS_META).map(([k, v]) => (
+                  <option key={k} value={k}>{v.label}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Currency">
+              <select
+                value={invoice.currency}
+                onChange={(e) => upd('currency', e.target.value)}
+                className="w-full bg-[#0a0a0a] border border-white/10 text-white text-sm px-3 py-2
+                           focus:outline-none focus:border-[#ff5500]/60 transition-colors"
+              >
+                <option value="BDT">BDT (৳)</option>
+                <option value="USD">USD ($)</option>
+              </select>
+            </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
             <Field label="Invoice Date">
               <Input type="date" value={invoice.date} onChange={(v) => upd('date', v)} />
             </Field>
@@ -512,6 +575,7 @@ function InvoiceEditor({ invoice, onChange, business }) {
           items={invoice.items}
           onChange={(items) => upd('items', items)}
           currency={invoice.currency}
+          products={products}
         />
 
         {/* Subtotal summary */}
@@ -643,10 +707,16 @@ export default function InvoiceMaker() {
   const [deleteTarget,   setDeleteTarget]   = useState(null);
   const [exporting,      setExporting]      = useState(false);
   const [sidebarOpen,    setSidebarOpen]    = useState(true);
+  const [products,       setProducts]       = useState([]);
 
   const previewRef = useRef(null);
 
   const activeInvoice = invoices.find((inv) => inv.id === activeId) ?? null;
+
+  /* ── Load products for description suggestions ─────────────────── */
+  useEffect(() => {
+    fetchProducts().then(setProducts).catch(() => {});
+  }, []);
 
   /* ── Persist on change ─────────────────────────────────────────── */
   useEffect(() => { persist('invoices', invoices); }, [invoices]);
@@ -921,6 +991,7 @@ export default function InvoiceMaker() {
                   invoice={activeInvoice}
                   onChange={updateActive}
                   business={business}
+                  products={products}
                 />
               </div>
             )}

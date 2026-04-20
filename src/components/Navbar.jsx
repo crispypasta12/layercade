@@ -104,7 +104,7 @@ export default function Navbar() {
       <Link
         to="/"
         onClick={handleLogoClick}
-        className="font-headline font-black text-2xl tracking-tighter text-white uppercase italic select-none"
+        className="font-headline font-black text-2xl tracking-wide text-white hover:text-[#ff5500] transition-colors uppercase italic select-none"
       >
         Layercade
       </Link>

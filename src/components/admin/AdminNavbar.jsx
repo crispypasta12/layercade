@@ -8,6 +8,8 @@ const NAV_LINKS = [
   { label: 'Categories', to: '/admin/categories' },
   { label: 'Calculator', to: '/admin/calculator' },
   { label: 'Invoices',   to: '/admin/invoices' },
+  { label: 'Tasks',      to: '/admin/tasks' },
+  { label: 'Expenses',   to: '/admin/expenses' },
 ];
 
 export default function AdminNavbar() {
@@ -22,9 +24,9 @@ export default function AdminNavbar() {
     <header className="bg-[#111111] border-b border-white/10 px-6 py-4 flex items-center justify-between sticky top-0 z-40">
       {/* Logo + nav links */}
       <div className="flex items-center gap-6">
-        <div className="flex items-center gap-3">
+        <NavLink to="/admin" end className="flex items-center gap-3">
           <span
-            className="uppercase tracking-tight text-white"
+            className="uppercase tracking-tight text-white hover:text-[#ff5500] transition-colors"
             style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.5rem' }}
           >
             Layercade
@@ -32,7 +34,7 @@ export default function AdminNavbar() {
           <span className="font-technical text-[10px] text-stone-500 uppercase tracking-widest border border-white/10 px-2 py-0.5">
             Admin
           </span>
-        </div>
+        </NavLink>
 
         <nav className="flex items-center gap-1">
           {NAV_LINKS.map(({ label, to, end }) => (

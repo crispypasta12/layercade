@@ -746,13 +746,14 @@ export default function InvoiceMaker() {
     setExporting(true);
     try {
       const canvas = await html2canvas(previewRef.current, {
-        scale: 2,
+        scale: 1.5,           // 1.5× = ~144 DPI, sharp enough for print
         useCORS: true,
         backgroundColor: '#ffffff',
         logging: false,
       });
 
-      const imgData = canvas.toDataURL('image/png');
+      // JPEG at 88% quality is ~10× smaller than PNG for white-background documents
+      const imgData = canvas.toDataURL('image/jpeg', 0.88);
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
       const pdfW = pdf.internal.pageSize.getWidth();
@@ -761,7 +762,7 @@ export default function InvoiceMaker() {
       const imgH = pdfW * imgAspect;
 
       if (imgH <= pdfH) {
-        pdf.addImage(imgData, 'PNG', 0, 0, pdfW, imgH);
+        pdf.addImage(imgData, 'JPEG', 0, 0, pdfW, imgH);
       } else {
         // Multi-page: slice canvas into page-height chunks
         let yOffset = 0;
@@ -775,7 +776,7 @@ export default function InvoiceMaker() {
           sliceCanvas.height = sliceH;
           const ctx = sliceCanvas.getContext('2d');
           ctx.drawImage(canvas, 0, yOffset, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
-          pdf.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', 0, 0, pdfW, (sliceH / canvas.width) * pdfW);
+          pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.88), 'JPEG', 0, 0, pdfW, (sliceH / canvas.width) * pdfW);
           yOffset += sliceH;
           page++;
         }

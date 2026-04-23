@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { SpeedInsights } from '@vercel/speed-insights/react';
+import { Analytics } from '@vercel/analytics/react';
 import { useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import AnnouncementBar from './components/AnnouncementBar';
@@ -146,6 +147,7 @@ export default function App() {
         <Route path="/*" element={<Layout />} />
       </Routes>
     </BrowserRouter>
+    <Analytics />
     <SpeedInsights />
     </>
   );

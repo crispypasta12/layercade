@@ -1,6 +1,30 @@
 import { useState, useEffect, useRef } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { useCurrentMember } from '../../contexts/CurrentMemberContext';
+
+function initials(name) {
+  return name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+}
+
+function UserChip({ member, compact = false }) {
+  if (!member) return null;
+  return (
+    <div className="flex items-center gap-2 px-2 py-1 border border-white/10 rounded-sm">
+      <div
+        className="flex items-center justify-center flex-shrink-0 rounded-sm"
+        style={{ width: 22, height: 22, background: member.color || '#555', fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 700, color: '#fff' }}
+      >
+        {initials(member.name)}
+      </div>
+      {!compact && (
+        <span className="font-technical text-[10px] uppercase tracking-widest text-stone-300 whitespace-nowrap">
+          {member.name.split(' ')[0]}
+        </span>
+      )}
+    </div>
+  );
+}
 
 const NAV_LINKS = [
   { label: 'Dashboard',  to: '/admin',            end: true,  icon: 'dashboard' },
@@ -16,6 +40,7 @@ const NAV_LINKS = [
 export default function AdminNavbar() {
   const navigate  = useNavigate();
   const location  = useLocation();
+  const { member } = useCurrentMember();
   const [open, setOpen] = useState(false);
   const drawerRef = useRef(null);
 
@@ -75,6 +100,11 @@ export default function AdminNavbar() {
         </nav>
 
         <div className="flex items-center gap-3">
+          {/* Desktop user chip (with name) */}
+          <div className="hidden lg:flex">
+            <UserChip member={member} />
+          </div>
+
           {/* Desktop logout */}
           <button
             onClick={handleLogout}
@@ -84,6 +114,11 @@ export default function AdminNavbar() {
             <span className="material-symbols-outlined" style={{ fontSize: 16 }}>logout</span>
             Logout
           </button>
+
+          {/* Mobile user chip (compact, always visible) */}
+          <div className="flex lg:hidden">
+            <UserChip member={member} compact />
+          </div>
 
           {/* Mobile hamburger */}
           <button
@@ -112,12 +147,15 @@ export default function AdminNavbar() {
       >
         {/* Drawer header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
-          <span
-            className="uppercase tracking-tight text-white"
-            style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.3rem' }}
-          >
-            Menu
-          </span>
+          <div className="flex items-center gap-3 min-w-0">
+            <span
+              className="uppercase tracking-tight text-white"
+              style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.3rem' }}
+            >
+              Menu
+            </span>
+            {member && <UserChip member={member} />}
+          </div>
           <button
             onClick={() => setOpen(false)}
             className="text-stone-500 hover:text-white transition-colors"

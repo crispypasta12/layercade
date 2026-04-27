@@ -24,7 +24,8 @@ export default function AdminLogin() {
       return;
     }
 
-    navigate('/admin/orders', { replace: true });
+    sessionStorage.setItem('show_welcome', '1');
+    navigate('/admin/expenses', { replace: true });
   };
 
   const inputClass =

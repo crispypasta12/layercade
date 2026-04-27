@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import AdminNavbar from '../../components/admin/AdminNavbar';
 import { supabase } from '../../lib/supabase';
+import { useCurrentMember } from '../../contexts/CurrentMemberContext';
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 const CATEGORIES = [
@@ -630,21 +631,24 @@ function SettleUpModal({ members, suggestion, onSave, onClose }) {
 }
 
 // ─── ExpenseCard ───────────────────────────────────────────────────────────────
-function ExpenseCard({ expense, splits, members, onEdit, onDelete }) {
+function ExpenseCard({ expense, splits, members, currentMember, onEdit, onDelete }) {
   const cat         = catById(expense.category);
   const payer       = members.find((m) => m.id === expense.paid_by);
   const participants = members.filter((m) =>
     splits.some((s) => s.expense_id === expense.id && s.member_id === m.id)
   );
-  const myShare = splits.find(
-    (s) => s.expense_id === expense.id
-  );
+
+  const youPaid = currentMember && expense.paid_by === currentMember.id;
+  const yourShareRow = currentMember
+    ? splits.find((s) => s.expense_id === expense.id && s.member_id === currentMember.id)
+    : null;
+  const involvesMe = youPaid || !!yourShareRow;
 
   return (
     <div
-      style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 6, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14, transition: 'border-color 0.15s' }}
-      onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)')}
-      onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)')}
+      style={{ background: '#111', border: `1px solid ${involvesMe ? '#ff550028' : 'rgba(255,255,255,0.06)'}`, borderRadius: 6, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14, transition: 'border-color 0.15s' }}
+      onMouseEnter={(e) => (e.currentTarget.style.borderColor = involvesMe ? '#ff550055' : 'rgba(255,255,255,0.12)')}
+      onMouseLeave={(e) => (e.currentTarget.style.borderColor = involvesMe ? '#ff550028' : 'rgba(255,255,255,0.06)')}
     >
       <CategoryIcon catId={expense.category} size={42} />
 
@@ -703,6 +707,11 @@ function ExpenseCard({ expense, splits, members, onEdit, onDelete }) {
         <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: cat.color, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 2 }}>
           {cat.label}
         </div>
+        {involvesMe && (
+          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: youPaid ? '#10b981' : '#ff5500', marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            {youPaid ? 'You paid' : `Your share ${fmt(yourShareRow.amount)}`}
+          </div>
+        )}
       </div>
 
       {/* Actions */}
@@ -730,6 +739,7 @@ function ExpenseCard({ expense, splits, members, onEdit, onDelete }) {
 
 // ─── Main Expenses Page ────────────────────────────────────────────────────────
 export default function Expenses() {
+  const { member: currentMember } = useCurrentMember();
   const [members,     setMembers]     = useState([]);
   const [expenses,    setExpenses]    = useState([]);
   const [splits,      setSplits]      = useState([]);
@@ -745,6 +755,7 @@ export default function Expenses() {
   const [search,         setSearch]         = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterMember,   setFilterMember]   = useState('');
+  const [onlyMine,       setOnlyMine]       = useState(false);
 
   useEffect(() => { loadAll(); }, []);
 
@@ -791,9 +802,14 @@ export default function Expenses() {
       if (search && !exp.title.toLowerCase().includes(search.toLowerCase())) return false;
       if (filterCategory && exp.category !== filterCategory) return false;
       if (filterMember && !splits.some((s) => s.expense_id === exp.id && s.member_id === filterMember)) return false;
+      if (onlyMine && currentMember) {
+        const involved = exp.paid_by === currentMember.id ||
+          splits.some((s) => s.expense_id === exp.id && s.member_id === currentMember.id);
+        if (!involved) return false;
+      }
       return true;
     });
-  }, [expenses, splits, search, filterCategory, filterMember]);
+  }, [expenses, splits, search, filterCategory, filterMember, onlyMine, currentMember]);
 
   const groupedExpenses = useMemo(() => {
     const groups = {};
@@ -976,9 +992,24 @@ export default function Expenses() {
                 <option value="">All Members</option>
                 {members.map((m) => <option key={m.id} value={m.id}>{m.name.split(' ')[0]}</option>)}
               </select>
-              {(search || filterCategory || filterMember) && (
+              {currentMember && (
                 <button
-                  onClick={() => { setSearch(''); setFilterCategory(''); setFilterMember(''); }}
+                  onClick={() => setOnlyMine((v) => !v)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px',
+                    background: onlyMine ? '#ff550018' : '#161616',
+                    border: `1px solid ${onlyMine ? '#ff5500' : 'rgba(255,255,255,0.1)'}`,
+                    borderRadius: 4, color: onlyMine ? '#ff5500' : '#888', cursor: 'pointer',
+                    fontFamily: "'Space Mono', monospace", fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap',
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>person</span>
+                  Just Mine
+                </button>
+              )}
+              {(search || filterCategory || filterMember || onlyMine) && (
+                <button
+                  onClick={() => { setSearch(''); setFilterCategory(''); setFilterMember(''); setOnlyMine(false); }}
                   style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '8px 12px', background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 4, color: '#666', cursor: 'pointer', fontFamily: "'Space Mono', monospace", fontSize: 10 }}
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: 14 }}>filter_alt_off</span>
@@ -1018,6 +1049,7 @@ export default function Expenses() {
                             expense={exp}
                             splits={splits}
                             members={members}
+                            currentMember={currentMember}
                             onEdit={openEdit}
                             onDelete={handleDeleteExpense}
                           />
@@ -1034,6 +1066,127 @@ export default function Expenses() {
         {/* ════════════════════ BALANCES TAB ════════════════════ */}
         {tab === 'balances' && (
           <div>
+            {/* My Balance panel */}
+            {currentMember && (() => {
+              const myBal = balances[currentMember.id] || 0;
+              const iOwe       = debtTxns.filter((t) => t.from === currentMember.id);
+              const owedToMe   = debtTxns.filter((t) => t.to   === currentMember.id);
+              const isOwed = myBal > 0.01;
+              const isOwing = myBal < -0.01;
+              const accent = isOwed ? '#10b981' : isOwing ? '#ef4444' : '#666';
+              const label  = isOwed ? 'You are owed' : isOwing ? 'You owe' : 'You are settled up';
+
+              return (
+                <div style={{
+                  background: 'linear-gradient(135deg, #111 0%, #0d0d0d 100%)',
+                  border: `1px solid ${accent}33`,
+                  borderRadius: 8, padding: '24px 28px', marginBottom: 28,
+                }}>
+                  {/* Header row */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: iOwe.length || owedToMe.length ? 20 : 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                      <Avatar member={currentMember} size={48} />
+                      <div>
+                        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: '#666', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                          Signed in as
+                        </div>
+                        <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 16, color: '#e5e2e1', marginTop: 2 }}>
+                          {currentMember.name}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 28, fontWeight: 700, color: accent, lineHeight: 1 }}>
+                        {isOwed ? '+' : ''}{fmt(myBal)}
+                      </div>
+                      <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: `${accent}cc`, textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 6 }}>
+                        {label}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Two-column breakdown */}
+                  {(iOwe.length > 0 || owedToMe.length > 0) && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
+                      {/* You owe */}
+                      <div style={{ background: '#161616', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 6, padding: '14px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#ef4444' }}>arrow_upward</span>
+                          <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                            You owe
+                          </span>
+                        </div>
+                        {iOwe.length === 0 ? (
+                          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: '#444' }}>Nothing owed.</div>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {iOwe.map((txn, i) => {
+                              const to = members.find((m) => m.id === txn.to);
+                              if (!to) return null;
+                              return (
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                  <Avatar member={to} size={24} />
+                                  <span style={{ flex: 1, fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: '#ccc' }}>
+                                    {to.name.split(' ')[0]}
+                                  </span>
+                                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: '#ef4444' }}>
+                                    {fmt(txn.amount)}
+                                  </span>
+                                  <button
+                                    onClick={() => openSettle(txn)}
+                                    style={{ padding: '4px 10px', background: '#10b98115', border: '1px solid #10b98135', borderRadius: 4, color: '#10b981', cursor: 'pointer', fontFamily: "'Space Mono', monospace", fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.05em' }}
+                                  >
+                                    Pay
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Owed to you */}
+                      <div style={{ background: '#161616', border: '1px solid rgba(16,185,129,0.15)', borderRadius: 6, padding: '14px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#10b981' }}>arrow_downward</span>
+                          <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                            Owed to you
+                          </span>
+                        </div>
+                        {owedToMe.length === 0 ? (
+                          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: '#444' }}>Nothing owed to you.</div>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {owedToMe.map((txn, i) => {
+                              const from = members.find((m) => m.id === txn.from);
+                              if (!from) return null;
+                              return (
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                  <Avatar member={from} size={24} />
+                                  <span style={{ flex: 1, fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: '#ccc' }}>
+                                    {from.name.split(' ')[0]}
+                                  </span>
+                                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: '#10b981' }}>
+                                    {fmt(txn.amount)}
+                                  </span>
+                                  <button
+                                    onClick={() => openSettle(txn)}
+                                    style={{ padding: '4px 10px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 4, color: '#888', cursor: 'pointer', fontFamily: "'Space Mono', monospace", fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.05em' }}
+                                  >
+                                    Mark Paid
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             {/* Balance cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 12, marginBottom: 36 }}>
               {members.map((m) => {
@@ -1042,15 +1195,22 @@ export default function Expenses() {
                 const isOwed = bal > 0.01;
                 const isOwing= bal < -0.01;
                 const accent = isOwed ? '#10b981' : isOwing ? '#ef4444' : '#444';
+                const isMe   = currentMember?.id === m.id;
                 return (
                   <div
                     key={m.id}
                     style={{
-                      background: '#111',
-                      border: `1px solid ${isOwed ? '#10b98128' : isOwing ? '#ef444428' : 'rgba(255,255,255,0.06)'}`,
+                      background: isMe ? '#141414' : '#111',
+                      border: `1px solid ${isMe ? '#ff550055' : isOwed ? '#10b98128' : isOwing ? '#ef444428' : 'rgba(255,255,255,0.06)'}`,
                       borderRadius: 8, padding: '20px 16px', textAlign: 'center',
+                      position: 'relative',
                     }}
                   >
+                    {isMe && (
+                      <span style={{ position: 'absolute', top: 8, right: 8, fontFamily: "'Space Mono', monospace", fontSize: 8, color: '#ff5500', background: '#ff550018', padding: '2px 6px', borderRadius: 2, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                        You
+                      </span>
+                    )}
                     <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
                       <Avatar member={m} size={42} />
                     </div>
@@ -1110,17 +1270,18 @@ export default function Expenses() {
                   const fromMem = members.find((m) => m.id === txn.from);
                   const toMem   = members.find((m) => m.id === txn.to);
                   if (!fromMem || !toMem) return null;
+                  const involvesMe = currentMember && (txn.from === currentMember.id || txn.to === currentMember.id);
                   return (
                     <div
                       key={i}
-                      style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 6, padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 16 }}
+                      style={{ background: '#111', border: `1px solid ${involvesMe ? '#ff550033' : 'rgba(255,255,255,0.06)'}`, borderRadius: 6, padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 16 }}
                     >
                       {/* From */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                         <Avatar member={fromMem} size={34} />
                         <div>
-                          <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 14, color: '#e5e2e1' }}>
-                            {fromMem.name.split(' ')[0]}
+                          <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 14, color: '#e5e2e1', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            {currentMember?.id === fromMem.id ? 'You' : fromMem.name.split(' ')[0]}
                           </div>
                           <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: '#ef4444' }}>owes</div>
                         </div>
@@ -1138,7 +1299,7 @@ export default function Expenses() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'flex-end', minWidth: 0 }}>
                         <div style={{ textAlign: 'right' }}>
                           <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 14, color: '#e5e2e1' }}>
-                            {toMem.name.split(' ')[0]}
+                            {currentMember?.id === toMem.id ? 'You' : toMem.name.split(' ')[0]}
                           </div>
                           <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: '#10b981' }}>receives</div>
                         </div>
@@ -1176,11 +1337,11 @@ export default function Expenses() {
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: '#ccc' }}>
                             <span style={{ color: fromMem?.color || '#aaa', fontWeight: 600 }}>
-                              {fromMem?.name.split(' ')[0] || '?'}
+                              {currentMember?.id === fromMem?.id ? 'You' : fromMem?.name.split(' ')[0] || '?'}
                             </span>
                             {' paid '}
                             <span style={{ color: toMem?.color || '#aaa', fontWeight: 600 }}>
-                              {toMem?.name.split(' ')[0] || '?'}
+                              {currentMember?.id === toMem?.id ? 'you' : toMem?.name.split(' ')[0] || '?'}
                             </span>
                           </span>
                           {s.notes && (

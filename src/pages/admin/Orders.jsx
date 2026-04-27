@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
 import AdminNavbar from '../../components/admin/AdminNavbar';
 import OrderDetailModal from '../../components/admin/OrderDetailModal';
+import CreateOrderModal from '../../components/admin/CreateOrderModal';
 
 /* ─── Constants ──────────────────────────────────────────────────── */
 
@@ -74,7 +75,8 @@ export default function AdminOrders() {
   const [orders,        setOrders]        = useState([]);
   const [loading,       setLoading]       = useState(true);
   const [error,         setError]         = useState(null);
-  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [selectedOrder,    setSelectedOrder]    = useState(null);
+  const [showCreateOrder,  setShowCreateOrder]  = useState(false);
 
   // Filters
   const [statusFilter, setStatusFilter] = useState('all');
@@ -257,12 +259,20 @@ export default function AdminOrders() {
             <button
               onClick={exportCSV}
               disabled={filtered.length === 0}
-              className="sm:hidden flex items-center gap-2 bg-[#161616] border border-white/10 px-4 py-2
+              className="sm:hidden flex items-center gap-2 bg-[#161616] border border-white/10 px-3 py-2
                          font-technical text-xs uppercase tracking-widest text-stone-300
                          hover:border-[#ff5500] hover:text-[#ff5500] transition-colors
                          disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
             >
               <span className="material-symbols-outlined" style={{ fontSize: 14 }}>download</span>
+            </button>
+            <button
+              onClick={() => setShowCreateOrder(true)}
+              className="sm:hidden flex items-center gap-2 bg-[#ff5500] text-white px-3 py-2
+                         font-technical text-xs uppercase tracking-widest
+                         hover:bg-[#e04d00] transition-colors flex-shrink-0"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>add</span>
             </button>
           </div>
 
@@ -285,7 +295,7 @@ export default function AdminOrders() {
             />
           </div>
 
-          <div className="hidden sm:block sm:ml-auto">
+          <div className="hidden sm:flex sm:items-center sm:gap-2 sm:ml-auto">
             <button
               onClick={exportCSV}
               disabled={filtered.length === 0}
@@ -296,6 +306,15 @@ export default function AdminOrders() {
             >
               <span className="material-symbols-outlined" style={{ fontSize: 14 }}>download</span>
               Export CSV
+            </button>
+            <button
+              onClick={() => setShowCreateOrder(true)}
+              className="flex items-center gap-2 bg-[#ff5500] text-white px-4 py-2
+                         font-technical text-xs uppercase tracking-widest
+                         hover:bg-[#e04d00] transition-colors"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>add</span>
+              Create Order
             </button>
           </div>
         </div>
@@ -604,6 +623,18 @@ export default function AdminOrders() {
           onDeleted={(deletedId) => {
             setOrders((prev) => prev.filter((o) => o.id !== deletedId));
             setSelectedOrder(null);
+          }}
+        />
+      )}
+
+      {/* ── Create order modal ───────────────────────────────────── */}
+      {showCreateOrder && (
+        <CreateOrderModal
+          onClose={() => setShowCreateOrder(false)}
+          onCreated={(newOrder) => {
+            setOrders((prev) => [newOrder, ...prev]);
+            setShowCreateOrder(false);
+            setSelectedOrder(newOrder);
           }}
         />
       )}

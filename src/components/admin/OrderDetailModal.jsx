@@ -1,5 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { supabase } from '../../lib/supabase';
 
 /* ─── Constants ──────────────────────────────────────────────────── */
@@ -58,8 +60,10 @@ export default function OrderDetailModal({ order, onClose, onUpdated, onDeleted 
   const [updateMsg,    setUpdateMsg]    = useState(null); // { type: 'success'|'error', text }
   const [adminNote,    setAdminNote]    = useState(order.admin_notes ?? '');
   const [savingNote,   setSavingNote]   = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [deleting,      setDeleting]      = useState(false);
+  const [confirmDelete,  setConfirmDelete]  = useState(false);
+  const [deleting,       setDeleting]       = useState(false);
+  const [exportingPDF,   setExportingPDF]   = useState(false);
+  const invoiceRef = useRef(null);
 
   /* ── Close on Escape ──────────────────────────────────────────── */
   useEffect(() => {
@@ -141,6 +145,47 @@ export default function OrderDetailModal({ order, onClose, onUpdated, onDeleted 
     onDeleted(order.id);
   };
 
+  /* ── Export invoice PDF ──────────────────────────────────────── */
+  const exportInvoicePDF = async () => {
+    if (!invoiceRef.current) return;
+    setExportingPDF(true);
+    try {
+      const canvas = await html2canvas(invoiceRef.current, {
+        scale: 1.5,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+      });
+      const imgData  = canvas.toDataURL('image/jpeg', 0.88);
+      const pdf      = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pdfW     = pdf.internal.pageSize.getWidth();
+      const pdfH     = pdf.internal.pageSize.getHeight();
+      const imgH     = pdfW * (canvas.height / canvas.width);
+
+      if (imgH <= pdfH) {
+        pdf.addImage(imgData, 'JPEG', 0, 0, pdfW, imgH);
+      } else {
+        let yOffset = 0;
+        const pageHeightPx = Math.floor((pdfH / pdfW) * canvas.width);
+        let page = 0;
+        while (yOffset < canvas.height) {
+          if (page > 0) pdf.addPage();
+          const sliceH      = Math.min(pageHeightPx, canvas.height - yOffset);
+          const sliceCanvas = document.createElement('canvas');
+          sliceCanvas.width  = canvas.width;
+          sliceCanvas.height = sliceH;
+          sliceCanvas.getContext('2d').drawImage(canvas, 0, yOffset, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+          pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.88), 'JPEG', 0, 0, pdfW, (sliceH / canvas.width) * pdfW);
+          yOffset += sliceH;
+          page++;
+        }
+      }
+      pdf.save(`INV-ORD-${order.id}.pdf`);
+    } finally {
+      setExportingPDF(false);
+    }
+  };
+
   /* ── Derived values ───────────────────────────────────────────── */
   const items       = Array.isArray(order.items) ? order.items : [];
   const subtotal    = items.reduce((s, i) => s + (i.price ?? 0) * (i.quantity ?? 1), 0);
@@ -188,12 +233,32 @@ export default function OrderDetailModal({ order, onClose, onUpdated, onDeleted 
                 {formatDate(order.created_at)}
               </p>
             </div>
-            <button
-              onClick={onClose}
-              className="text-stone-500 hover:text-white transition-colors ml-4 flex-shrink-0"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 22 }}>close</span>
-            </button>
+            <div className="flex items-center gap-2 ml-4 flex-shrink-0">
+              <button
+                onClick={exportInvoicePDF}
+                disabled={exportingPDF}
+                className="flex items-center gap-1.5 border border-white/15 text-stone-400
+                           hover:text-white hover:border-white/30 px-3 py-1.5
+                           font-technical text-[10px] uppercase tracking-widest
+                           transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {exportingPDF ? (
+                  <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                  </svg>
+                ) : (
+                  <span className="material-symbols-outlined" style={{ fontSize: 13 }}>picture_as_pdf</span>
+                )}
+                Invoice PDF
+              </button>
+              <button
+                onClick={onClose}
+                className="text-stone-500 hover:text-white transition-colors"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 22 }}>close</span>
+              </button>
+            </div>
           </div>
 
           <div className="p-6 space-y-6">
@@ -509,7 +574,206 @@ export default function OrderDetailModal({ order, onClose, onUpdated, onDeleted 
           </div>
         </motion.div>
       </motion.div>
+
+      {/* Hidden invoice template rendered off-screen for PDF export */}
+      <div
+        style={{ position: 'fixed', top: '-9999px', left: '-9999px', zIndex: -1, pointerEvents: 'none' }}
+        aria-hidden="true"
+      >
+        <div ref={invoiceRef}>
+          <OrderInvoiceTemplate order={order} />
+        </div>
+      </div>
     </AnimatePresence>
+  );
+}
+
+/* ─── Order invoice template (rendered off-screen for PDF export) ── */
+
+function OrderInvoiceTemplate({ order }) {
+  const items       = Array.isArray(order.items) ? order.items : [];
+  const subtotal    = items.reduce((s, i) => s + (i.price || 0) * (i.quantity || 1), 0);
+  const deliveryFee = order.delivery_fee || 0;
+  const total       = order.total_amount || subtotal + deliveryFee;
+
+  const business = (() => {
+    try {
+      const raw = localStorage.getItem('inv_business');
+      if (raw) return JSON.parse(raw);
+    } catch { /* ignore */ }
+    return { name: 'Layercade', tagline: '3D Printing Studio', address: 'Mirpur DOHS, Dhaka, Bangladesh', phone: '', email: '', website: 'layercade.com' };
+  })();
+
+  const statusStyle = {
+    pending:   { background: '#fff7ed', color: '#9a3412' },
+    confirmed: { background: '#eff6ff', color: '#1d4ed8' },
+    shipped:   { background: '#f5f3ff', color: '#6d28d9' },
+    delivered: { background: '#f0fdf4', color: '#166534' },
+    cancelled: { background: '#fef2f2', color: '#991b1b' },
+  };
+  const statusLabels = { pending: 'Pending', confirmed: 'Confirmed', shipped: 'Shipped', delivered: 'Paid', cancelled: 'Cancelled' };
+
+  const fmt = (n) => `৳${(Number(n) || 0).toLocaleString('en-IN')}`;
+  const fmtD = (iso) => {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
+
+  const deliveryAddr = [order.district, order.area, order.address].filter(Boolean).join(', ');
+
+  return (
+    <div style={{
+      width: '794px',
+      minHeight: '1123px',
+      background: '#ffffff',
+      color: '#111111',
+      fontFamily: 'Georgia, serif',
+      padding: '60px 64px',
+      boxSizing: 'border-box',
+      position: 'relative',
+    }}>
+      {/* Orange accent bar */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '6px', background: '#ff5500' }} />
+
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '48px' }}>
+        <div>
+          <div style={{ fontFamily: 'Arial Black, Arial, sans-serif', fontSize: '28px', fontWeight: '900', letterSpacing: '0.06em', textTransform: 'uppercase', color: '#0a0a0a', lineHeight: 1 }}>
+            {business.name}
+          </div>
+          {business.tagline && (
+            <div style={{ fontSize: '10px', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#888', marginTop: '4px' }}>
+              {business.tagline}
+            </div>
+          )}
+          <div style={{ marginTop: '12px', fontSize: '11px', color: '#555', lineHeight: 1.7 }}>
+            {business.address && <div>{business.address}</div>}
+            {business.phone   && <div>{business.phone}</div>}
+            {business.email   && <div>{business.email}</div>}
+            {business.website && <div>{business.website}</div>}
+          </div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontFamily: 'Arial Black, Arial, sans-serif', fontSize: '36px', fontWeight: '900', letterSpacing: '0.04em', textTransform: 'uppercase', color: '#ff5500', lineHeight: 1 }}>
+            Invoice
+          </div>
+          <div style={{ fontSize: '12px', color: '#888', marginTop: '8px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            #ORD-{order.id}
+          </div>
+          <div style={{ marginTop: '14px', fontSize: '11px', color: '#555', lineHeight: 1.8 }}>
+            <div><span style={{ color: '#999' }}>Date: </span>{fmtD(order.created_at)}</div>
+            <div style={{ marginTop: '4px' }}>
+              <span style={{
+                display: 'inline-block',
+                padding: '2px 8px',
+                ...(statusStyle[order.status] || { background: '#f3f4f6', color: '#374151' }),
+                fontSize: '10px',
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                fontFamily: 'Arial, sans-serif',
+                fontWeight: 'bold',
+              }}>
+                {statusLabels[order.status] || order.status}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div style={{ height: '1px', background: '#e5e7eb', marginBottom: '32px' }} />
+
+      {/* Bill To */}
+      <div style={{ marginBottom: '36px' }}>
+        <div style={{ fontSize: '9px', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#ff5500', marginBottom: '8px', fontFamily: 'Arial, sans-serif', fontWeight: 'bold' }}>
+          Bill To
+        </div>
+        <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#111', marginBottom: '4px' }}>
+          {order.customer_name || '—'}
+        </div>
+        <div style={{ fontSize: '11px', color: '#555', lineHeight: 1.7 }}>
+          {order.phone && <div>{order.phone}</div>}
+          {order.fulfillment_type === 'pickup'
+            ? <div>Mirpur DOHS, Dhaka (In-store Pickup)</div>
+            : deliveryAddr && <div>{deliveryAddr}</div>
+          }
+        </div>
+      </div>
+
+      {/* Line items table */}
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '24px', fontSize: '12px' }}>
+        <thead>
+          <tr style={{ background: '#0a0a0a' }}>
+            {[
+              { label: 'Description', align: 'left',   width: 'auto' },
+              { label: 'Qty',         align: 'center', width: '80px' },
+              { label: 'Unit Price',  align: 'right',  width: '120px' },
+              { label: 'Total',       align: 'right',  width: '120px' },
+            ].map(({ label, align, width }) => (
+              <th key={label} style={{ padding: '10px 14px', textAlign: align, color: '#fff', fontFamily: 'Arial, sans-serif', fontWeight: 'bold', fontSize: '9px', letterSpacing: '0.14em', textTransform: 'uppercase', width }}>
+                {label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item, idx) => {
+            const lineTotal = (item.price || 0) * (item.quantity || 1);
+            return (
+              <tr key={idx} style={{ background: idx % 2 === 0 ? '#ffffff' : '#f9fafb', borderBottom: '1px solid #f0f0f0' }}>
+                <td style={{ padding: '11px 14px', color: '#222' }}>{item.name || '—'}</td>
+                <td style={{ padding: '11px 14px', textAlign: 'center', color: '#555', fontFamily: 'monospace' }}>{item.quantity || 1}</td>
+                <td style={{ padding: '11px 14px', textAlign: 'right',  color: '#555', fontFamily: 'monospace' }}>{fmt(item.price)}</td>
+                <td style={{ padding: '11px 14px', textAlign: 'right',  color: '#222', fontFamily: 'monospace', fontWeight: 'bold' }}>{fmt(lineTotal)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      {/* Totals */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '40px' }}>
+        <div style={{ width: '260px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderTop: '1px solid #e5e7eb' }}>
+            <span style={{ fontSize: '11px', color: '#888', fontFamily: 'Arial, sans-serif' }}>Subtotal</span>
+            <span style={{ fontSize: '12px', color: '#222', fontFamily: 'monospace', fontWeight: 'bold' }}>{fmt(subtotal)}</span>
+          </div>
+          {deliveryFee > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderTop: '1px solid #e5e7eb' }}>
+              <span style={{ fontSize: '11px', color: '#888', fontFamily: 'Arial, sans-serif' }}>Delivery Fee</span>
+              <span style={{ fontSize: '12px', color: '#222', fontFamily: 'monospace', fontWeight: 'bold' }}>{fmt(deliveryFee)}</span>
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: '#0a0a0a', marginTop: '4px' }}>
+            <span style={{ fontSize: '11px', color: '#ccc', fontFamily: 'Arial, sans-serif', fontWeight: 'bold', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Total Due</span>
+            <span style={{ fontSize: '16px', color: '#ff5500', fontFamily: 'monospace', fontWeight: 'bold' }}>{fmt(total)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Customer notes */}
+      {order.notes && (
+        <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '24px', marginBottom: '24px' }}>
+          <div style={{ fontSize: '9px', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#999', marginBottom: '8px', fontFamily: 'Arial, sans-serif', fontWeight: 'bold' }}>
+            Notes
+          </div>
+          <div style={{ fontSize: '11px', color: '#555', lineHeight: 1.7, whiteSpace: 'pre-line' }}>
+            {order.notes}
+          </div>
+        </div>
+      )}
+
+      {/* Footer */}
+      <div style={{ position: 'absolute', bottom: '36px', left: '64px', right: '64px', borderTop: '1px solid #e5e7eb', paddingTop: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: '10px', color: '#bbb', fontFamily: 'Arial, sans-serif', letterSpacing: '0.06em' }}>
+          {business.name} · {business.website || business.email || business.phone || ''}
+        </span>
+        <span style={{ fontSize: '10px', color: '#ff5500', fontFamily: 'Arial Black, Arial, sans-serif', fontWeight: '900', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+          Thank you
+        </span>
+      </div>
+    </div>
   );
 }
 

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { CurrentMemberProvider } from '../contexts/CurrentMemberContext';
+import WelcomeGuard from './admin/WelcomeScreen';
 
 export default function ProtectedRoute({ children }) {
   const [session, setSession] = useState(undefined); // undefined = loading
@@ -32,5 +34,11 @@ export default function ProtectedRoute({ children }) {
     return <Navigate to="/admin/login" replace />;
   }
 
-  return children;
+  return (
+    <CurrentMemberProvider session={session}>
+      <WelcomeGuard>
+        {children}
+      </WelcomeGuard>
+    </CurrentMemberProvider>
+  );
 }

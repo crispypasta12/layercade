@@ -56,10 +56,10 @@ function StatusBadge({ status }) {
 
 function StatCard({ label, value, accent }) {
   return (
-    <div className="bg-[#111111] border border-white/10 p-5 flex flex-col gap-1">
+    <div className="bg-[#111111] border border-white/10 p-4 md:p-5 flex flex-col gap-1">
       <span className="font-technical text-[10px] text-stone-500 uppercase tracking-widest">{label}</span>
       <span
-        className="font-mono text-2xl font-bold"
+        className="font-mono text-xl md:text-2xl font-bold"
         style={{ color: accent ? '#ff5500' : '#ffffff', fontFamily: "'Space Mono', monospace" }}
       >
         {value}
@@ -207,7 +207,7 @@ export default function AdminOrders() {
     <div className="min-h-screen bg-[#080808] text-white">
       <AdminNavbar />
 
-      <div className="px-6 py-8 max-w-screen-2xl mx-auto space-y-8">
+      <div className="px-4 md:px-6 py-6 md:py-8 max-w-screen-2xl mx-auto space-y-6 md:space-y-8">
 
         {/* ── Page title ──────────────────────────────────────────── */}
         <div>
@@ -223,7 +223,7 @@ export default function AdminOrders() {
         </div>
 
         {/* ── Stats cards ─────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           <StatCard label="Total Orders"     value={totalOrders}                                              />
           <StatCard label="Pending"          value={pendingOrders}   accent                                   />
           <StatCard label="Delivered"        value={completedOrders}                                          />
@@ -231,29 +231,43 @@ export default function AdminOrders() {
         </div>
 
         {/* ── Filters + Export ────────────────────────────────────── */}
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Status filter */}
-          <div className="relative">
-            <select
-              value={statusFilter}
-              onChange={(e) => handleStatusChange(e.target.value)}
-              className={selectClass}
-              style={{ paddingRight: '2rem' }}
+        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
+          <div className="flex gap-3">
+            {/* Status filter */}
+            <div className="relative flex-1 sm:flex-none">
+              <select
+                value={statusFilter}
+                onChange={(e) => handleStatusChange(e.target.value)}
+                className={selectClass + ' w-full'}
+                style={{ paddingRight: '2rem' }}
+              >
+                {STATUS_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value} className="bg-[#161616]">{o.label}</option>
+                ))}
+              </select>
+              <span
+                className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-stone-500"
+                style={{ fontSize: 16 }}
+              >
+                expand_more
+              </span>
+            </div>
+
+            {/* Export CSV (shown inline on mobile) */}
+            <button
+              onClick={exportCSV}
+              disabled={filtered.length === 0}
+              className="sm:hidden flex items-center gap-2 bg-[#161616] border border-white/10 px-4 py-2
+                         font-technical text-xs uppercase tracking-widest text-stone-300
+                         hover:border-[#ff5500] hover:text-[#ff5500] transition-colors
+                         disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
             >
-              {STATUS_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value} className="bg-[#161616]">{o.label}</option>
-              ))}
-            </select>
-            <span
-              className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-stone-500"
-              style={{ fontSize: 16 }}
-            >
-              expand_more
-            </span>
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>download</span>
+            </button>
           </div>
 
           {/* Search */}
-          <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <div className="relative flex-1 sm:min-w-[200px] sm:max-w-sm">
             <span
               className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-stone-600"
               style={{ fontSize: 16 }}
@@ -271,7 +285,7 @@ export default function AdminOrders() {
             />
           </div>
 
-          <div className="ml-auto">
+          <div className="hidden sm:block sm:ml-auto">
             <button
               onClick={exportCSV}
               disabled={filtered.length === 0}
@@ -306,7 +320,7 @@ export default function AdminOrders() {
           </div>
         )}
 
-        {/* ── Table ──────────────────────────────────────────────── */}
+        {/* ── Table / Cards ───────────────────────────────────────── */}
         {loading ? (
           <div className="flex items-center justify-center py-24">
             <svg className="animate-spin w-8 h-8 text-[#ff5500]" viewBox="0 0 24 24" fill="none">
@@ -314,31 +328,140 @@ export default function AdminOrders() {
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
             </svg>
           </div>
+        ) : paginated.length === 0 ? (
+          <div className="text-center font-body text-stone-600 py-16 bg-[#111111] border border-white/5">
+            No orders found.
+          </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-sm border-collapse">
-              <thead>
-                <tr className="border-b border-white/10">
-                  {['Order ID', 'Date', 'Customer', 'Phone', 'Fulfillment', 'District', 'Items', 'Total', 'Status', 'Advance', ''].map((h) => (
-                    <th
-                      key={h}
-                      className="text-left font-technical text-[10px] text-stone-500 uppercase tracking-widest
-                                 py-3 px-4 whitespace-nowrap"
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {paginated.length === 0 ? (
-                  <tr>
-                    <td colSpan={10} className="text-center font-body text-stone-600 py-16">
-                      No orders found.
-                    </td>
+          <>
+            {/* Mobile cards (hidden on md+) */}
+            <div className="md:hidden space-y-3">
+              {paginated.map((order, idx) => {
+                const itemCount = Array.isArray(order.items)
+                  ? order.items.reduce((s, i) => s + (i.quantity ?? 1), 0)
+                  : 0;
+                return (
+                  <motion.div
+                    key={order.id}
+                    className="bg-[#111111] border border-white/10 p-4 space-y-3"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.2, delay: idx * 0.02 }}
+                  >
+                    {/* Top row: order ID + status */}
+                    <div className="flex items-center justify-between gap-2">
+                      <span
+                        className="font-mono text-[#ff5500] text-sm"
+                        style={{ fontFamily: "'Space Mono', monospace" }}
+                      >
+                        #ORD-{order.id}
+                      </span>
+                      <StatusBadge status={order.status} />
+                    </div>
+
+                    {/* Customer + amount */}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-body text-white text-sm truncate">
+                        {order.customer_name ?? '—'}
+                      </span>
+                      <span
+                        className="font-mono text-white text-sm whitespace-nowrap flex-shrink-0"
+                        style={{ fontFamily: "'Space Mono', monospace" }}
+                      >
+                        ৳{(order.total_amount ?? 0).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+
+                    {/* Meta row */}
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <span className="font-technical text-[10px] text-stone-500 uppercase tracking-widest">
+                        {order.phone ?? '—'}
+                      </span>
+                      <span className="font-technical text-[10px] text-stone-600">·</span>
+                      <span className="font-technical text-[10px] text-stone-500 uppercase tracking-widest">
+                        {itemCount} {itemCount === 1 ? 'item' : 'items'}
+                      </span>
+                      {order.district && (
+                        <>
+                          <span className="font-technical text-[10px] text-stone-600">·</span>
+                          <span className="font-technical text-[10px] text-stone-500 uppercase tracking-widest">
+                            {order.district}
+                          </span>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {order.fulfillment_type === 'pickup' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-technical uppercase tracking-widest bg-blue-500/20 text-blue-400">
+                          <span className="material-symbols-outlined" style={{ fontSize: 11, fontVariationSettings: "'FILL' 1" }}>storefront</span>
+                          Pickup
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-technical uppercase tracking-widest bg-stone-800 text-stone-400">
+                          <span className="material-symbols-outlined" style={{ fontSize: 11, fontVariationSettings: "'FILL' 1" }}>local_shipping</span>
+                          Delivery
+                        </span>
+                      )}
+                      <span className="font-technical text-[10px] text-stone-600 uppercase tracking-widest ml-auto">
+                        {formatDate(order.created_at)}
+                      </span>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-2 pt-1 border-t border-white/5">
+                      {NEXT_STATUS[order.status] && (
+                        <button
+                          onClick={() => handleAdvance(order)}
+                          disabled={advancingIds.has(order.id)}
+                          className="flex-1 flex items-center justify-center gap-1.5 font-technical text-[10px] uppercase
+                                     tracking-widest px-3 py-2.5 border transition-colors
+                                     border-[#ff5500]/30 text-[#ff5500] hover:bg-[#ff5500]/10
+                                     disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {advancingIds.has(order.id) ? (
+                            <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                            </svg>
+                          ) : (
+                            <span className="material-symbols-outlined" style={{ fontSize: 11 }}>arrow_forward</span>
+                          )}
+                          → {STATUS_COLORS[NEXT_STATUS[order.status]]?.label}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setSelectedOrder(order)}
+                        className={`${NEXT_STATUS[order.status] ? '' : 'flex-1'} font-technical text-[10px] uppercase tracking-widest
+                                   text-stone-400 hover:text-[#ff5500] border border-white/10
+                                   hover:border-[#ff5500] px-3 py-2.5 transition-colors`}
+                      >
+                        View Details
+                      </button>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+
+            {/* Desktop table (hidden on mobile) */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full min-w-[900px] text-sm border-collapse">
+                <thead>
+                  <tr className="border-b border-white/10">
+                    {['Order ID', 'Date', 'Customer', 'Phone', 'Fulfillment', 'District', 'Items', 'Total', 'Status', 'Advance', ''].map((h) => (
+                      <th
+                        key={h}
+                        className="text-left font-technical text-[10px] text-stone-500 uppercase tracking-widest
+                                   py-3 px-4 whitespace-nowrap"
+                      >
+                        {h}
+                      </th>
+                    ))}
                   </tr>
-                ) : (
-                  paginated.map((order, idx) => {
+                </thead>
+                <tbody>
+                  {paginated.map((order, idx) => {
                     const itemCount = Array.isArray(order.items)
                       ? order.items.reduce((s, i) => s + (i.quantity ?? 1), 0)
                       : 0;
@@ -428,11 +551,11 @@ export default function AdminOrders() {
                         </td>
                       </motion.tr>
                     );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
 
         {/* ── Pagination ──────────────────────────────────────────── */}

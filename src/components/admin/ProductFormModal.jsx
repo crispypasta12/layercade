@@ -57,6 +57,7 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
   const [slug, setSlug] = useState(product?.slug ?? '');
   const [description, setDescription] = useState(product?.description ?? '');
   const [price, setPrice] = useState(product?.price != null ? String(product.price) : '');
+  const [costPrice, setCostPrice] = useState(product?.cost_price != null ? String(product.cost_price) : '');
   const [category, setCategory] = useState(product?.category ?? '');
   const [stockStatus, setStockStatus] = useState(product?.stock_status ?? 'in_stock');
   const [featured, setFeatured] = useState(product?.featured ?? false);
@@ -188,6 +189,7 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
       slug: slug.trim(),
       description: description.trim(),
       price: Number(price),
+      cost_price: costPrice !== '' && !isNaN(Number(costPrice)) ? Number(costPrice) : null,
       category,
       image: imageUrls[0] ?? '',
       images: imageUrls,
@@ -335,21 +337,45 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
             />
           </Field>
 
-          <Field label="Price (BDT) *" error={fieldErrors.price}>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-stone-400 text-sm select-none">BDT</span>
-              <input
-                type="number"
-                min={0}
-                step={1}
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                placeholder="0"
-                disabled={isFormLocked}
-                className={inputClass + ' pl-12'}
-              />
-            </div>
-          </Field>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Selling Price (BDT) *" error={fieldErrors.price}>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-stone-400 text-sm select-none">BDT</span>
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder="0"
+                  disabled={isFormLocked}
+                  className={inputClass + ' pl-12'}
+                />
+              </div>
+            </Field>
+
+            <Field label="Cost Price (BDT)">
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-stone-400 text-sm select-none">BDT</span>
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={costPrice}
+                  onChange={(e) => setCostPrice(e.target.value)}
+                  placeholder="Optional"
+                  disabled={isFormLocked}
+                  className={inputClass + ' pl-12'}
+                />
+              </div>
+              {costPrice !== '' && price !== '' && !isNaN(Number(costPrice)) && !isNaN(Number(price)) && Number(price) > 0 && (
+                <p className="font-technical text-[10px] text-stone-500 mt-1">
+                  Margin: {(((Number(price) - Number(costPrice)) / Number(price)) * 100).toFixed(1)}%
+                  &nbsp;·&nbsp;Profit: ৳{(Number(price) - Number(costPrice)).toLocaleString('en-IN')}
+                </p>
+              )}
+            </Field>
+          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Category *">

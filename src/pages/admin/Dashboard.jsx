@@ -14,6 +14,23 @@ const STATUS_PIPELINE = [
   { key: 'cancelled', label: 'Cancelled', color: 'text-red-400',    bg: 'bg-red-500/10',    border: 'border-red-500/30' },
 ];
 
+const EXPENSE_CATEGORIES = [
+  { key: 'food',     label: 'Food & Drinks',    color: '#f97316' },
+  { key: 'transport', label: 'Transport',        color: '#3b82f6' },
+  { key: 'office',   label: 'Office Supplies',  color: '#8b5cf6' },
+  { key: 'software', label: 'Software/Tools',   color: '#06b6d4' },
+  { key: 'marketing', label: 'Marketing',       color: '#ec4899' },
+  { key: 'utilities', label: 'Utilities',       color: '#84cc16' },
+  { key: 'other',    label: 'Other',            color: '#6b7280' },
+];
+
+const SUMMARY_PERIODS = [
+  { key: 'today', label: 'Today' },
+  { key: 'week',  label: '7 Days' },
+  { key: 'month', label: 'Month' },
+  { key: 'all',   label: 'All Time' },
+];
+
 const QUICK_LINKS = [
   { label: 'Manage Orders',     to: '/admin/orders',     icon: 'receipt_long' },
   { label: 'Manage Products',   to: '/admin/products',   icon: 'inventory_2' },
@@ -115,9 +132,11 @@ function StatusBadge({ status }) {
 /* ─── Main component ─────────────────────────────────────────────── */
 
 export default function AdminDashboard() {
-  const [orders,     setOrders]     = useState([]);
-  const [lowStock,   setLowStock]   = useState([]);
-  const [loading,    setLoading]    = useState(true);
+  const [orders,        setOrders]        = useState([]);
+  const [lowStock,      setLowStock]      = useState([]);
+  const [expenses,      setExpenses]      = useState([]);
+  const [loading,       setLoading]       = useState(true);
+  const [summaryPeriod, setSummaryPeriod] = useState('month');
 
   useEffect(() => {
     Promise.all([
@@ -130,9 +149,13 @@ export default function AdminDashboard() {
         .select('id, name, category, price, stock_status, image, images')
         .eq('stock_status', 'low_stock')
         .order('sort_order', { ascending: true }),
-    ]).then(([ordersRes, productsRes]) => {
+      supabase
+        .from('expenses')
+        .select('id, amount, date, category, title'),
+    ]).then(([ordersRes, productsRes, expensesRes]) => {
       setOrders(ordersRes.data ?? []);
       setLowStock(productsRes.data ?? []);
+      setExpenses(expensesRes.data ?? []);
       setLoading(false);
     });
   }, []);
@@ -146,6 +169,24 @@ export default function AdminDashboard() {
     month:    activeOrders.filter((o) => new Date(o.created_at) >= monthStart())   .reduce((s, o) => s + (o.total_amount ?? 0), 0),
     allTime:  activeOrders.reduce((s, o) => s + (o.total_amount ?? 0), 0),
   };
+
+  function expenseSum(filter) {
+    return expenses.filter(filter).reduce((s, e) => s + (e.amount ?? 0), 0);
+  }
+
+  const expenseTotals = {
+    today:  expenseSum((e) => new Date(e.date) >= todayStart()),
+    week:   expenseSum((e) => new Date(e.date) >= daysAgo(7)),
+    month:  expenseSum((e) => new Date(e.date) >= monthStart()),
+    all:    expenseSum(() => true),
+  };
+
+  const revByPeriod = { today: revenue.today, week: revenue.week, month: revenue.month, all: revenue.allTime };
+
+  const expenseCategoryTotals = EXPENSE_CATEGORIES.map((cat) => ({
+    ...cat,
+    total: expenseSum((e) => e.category === cat.key),
+  })).filter((c) => c.total > 0);
 
   const statusCounts = STATUS_PIPELINE.reduce((acc, s) => {
     acc[s.key] = orders.filter((o) => o.status === s.key).length;
@@ -208,6 +249,138 @@ export default function AdminDashboard() {
               sub={`${activeOrders.length} active ${activeOrders.length === 1 ? 'order' : 'orders'}`}
             />
           </div>
+        </div>
+
+        {/* ── Financial Summary ────────────────────────────────────── */}
+        <div>
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <p className="font-technical text-[10px] text-stone-500 uppercase tracking-widest">
+              Financial Summary
+            </p>
+            <div className="flex items-center gap-1">
+              {SUMMARY_PERIODS.map((p) => (
+                <button
+                  key={p.key}
+                  onClick={() => setSummaryPeriod(p.key)}
+                  className={`px-3 py-1 font-technical text-[10px] uppercase tracking-widest transition-colors ${
+                    summaryPeriod === p.key
+                      ? 'bg-[#ff5500] text-white'
+                      : 'bg-[#111111] border border-white/10 text-stone-500 hover:text-white hover:border-white/20'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 3-card row */}
+          {(() => {
+            const rev  = revByPeriod[summaryPeriod] ?? 0;
+            const exp  = expenseTotals[summaryPeriod] ?? 0;
+            const profit = rev - exp;
+            const margin = rev > 0 ? ((profit / rev) * 100).toFixed(1) : null;
+            const profitPositive = profit >= 0;
+            return (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {/* Revenue */}
+                <div className="bg-[#111111] border border-white/10 p-5 flex flex-col gap-1.5">
+                  <span className="font-technical text-[10px] text-stone-500 uppercase tracking-widest">Revenue</span>
+                  {loading ? (
+                    <div className="h-8 w-28 bg-white/5 animate-pulse rounded" />
+                  ) : (
+                    <span className="font-mono text-2xl font-bold text-[#ff5500]" style={{ fontFamily: "'Space Mono', monospace" }}>
+                      {formatCurrency(rev)}
+                    </span>
+                  )}
+                  <span className="font-technical text-[10px] text-stone-600 uppercase tracking-widest">from orders</span>
+                </div>
+
+                {/* Expenses */}
+                <div className="bg-[#111111] border border-white/10 p-5 flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-technical text-[10px] text-stone-500 uppercase tracking-widest">Expenses</span>
+                    <Link
+                      to="/admin/expenses"
+                      className="font-technical text-[9px] uppercase tracking-widest text-stone-600 hover:text-[#ff5500] transition-colors flex items-center gap-0.5"
+                    >
+                      Details
+                      <span className="material-symbols-outlined" style={{ fontSize: 11 }}>arrow_forward</span>
+                    </Link>
+                  </div>
+                  {loading ? (
+                    <div className="h-8 w-28 bg-white/5 animate-pulse rounded" />
+                  ) : (
+                    <span className="font-mono text-2xl font-bold text-blue-400" style={{ fontFamily: "'Space Mono', monospace" }}>
+                      {formatCurrency(exp)}
+                    </span>
+                  )}
+                  <span className="font-technical text-[10px] text-stone-600 uppercase tracking-widest">total spent</span>
+                </div>
+
+                {/* Net Profit */}
+                <div className={`p-5 flex flex-col gap-1.5 border ${
+                  loading ? 'bg-[#111111] border-white/10'
+                    : profitPositive ? 'bg-green-950/20 border-green-700/30' : 'bg-red-950/20 border-red-700/30'
+                }`}>
+                  <span className="font-technical text-[10px] text-stone-500 uppercase tracking-widest">Net Profit</span>
+                  {loading ? (
+                    <div className="h-8 w-28 bg-white/5 animate-pulse rounded" />
+                  ) : (
+                    <span
+                      className={`font-mono text-2xl font-bold ${profitPositive ? 'text-green-400' : 'text-red-400'}`}
+                      style={{ fontFamily: "'Space Mono', monospace" }}
+                    >
+                      {profitPositive ? '' : '-'}{formatCurrency(Math.abs(profit))}
+                    </span>
+                  )}
+                  <span className={`font-technical text-[10px] uppercase tracking-widest ${
+                    loading ? 'text-stone-600' : profitPositive ? 'text-green-700' : 'text-red-700'
+                  }`}>
+                    {loading ? '—' : margin !== null ? `${profitPositive ? '+' : ''}${margin}% margin` : 'no revenue'}
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Expense category breakdown */}
+          {!loading && expenseCategoryTotals.length > 0 && (
+            <div className="mt-3 bg-[#111111] border border-white/10 p-4">
+              <p className="font-technical text-[9px] text-stone-600 uppercase tracking-widest mb-3">
+                Expense Breakdown (All Time)
+              </p>
+              <div className="space-y-2">
+                {(() => {
+                  const grandTotal = expenseCategoryTotals.reduce((s, c) => s + c.total, 0);
+                  return expenseCategoryTotals
+                    .sort((a, b) => b.total - a.total)
+                    .map((cat) => {
+                      const pct = grandTotal > 0 ? (cat.total / grandTotal) * 100 : 0;
+                      return (
+                        <div key={cat.key} className="flex items-center gap-3">
+                          <span className="font-technical text-[9px] text-stone-500 uppercase tracking-widest w-28 flex-shrink-0 truncate">
+                            {cat.label}
+                          </span>
+                          <div className="flex-1 h-1.5 bg-white/5 overflow-hidden">
+                            <div
+                              className="h-full transition-all duration-500"
+                              style={{ width: `${pct}%`, backgroundColor: cat.color }}
+                            />
+                          </div>
+                          <span
+                            className="font-mono text-[10px] text-stone-400 w-20 text-right flex-shrink-0"
+                            style={{ fontFamily: "'Space Mono', monospace" }}
+                          >
+                            {formatCurrency(cat.total)}
+                          </span>
+                        </div>
+                      );
+                    });
+                })()}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ── Order pipeline ───────────────────────────────────────── */}

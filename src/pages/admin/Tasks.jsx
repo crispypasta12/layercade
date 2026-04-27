@@ -20,7 +20,19 @@ const PRIORITIES = [
   { id: 'critical', label: 'Critical', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' },
 ];
 
-const DEFAULT_LABELS = ['Frontend', 'Backend', 'Design', 'Marketing', 'Bug', 'Feature', 'Urgent'];
+const DEFAULT_LABELS = ['Frontend', 'Backend', 'Print Job', 'Design', 'Marketing', 'Bug', 'Feature', 'Urgent'];
+
+// ─── Hooks ────────────────────────────────────────────────────
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return isMobile;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────
 
@@ -163,12 +175,12 @@ function TaskCard({ task, members, onClick, onDragStart }) {
 
 // ─── Task Column ──────────────────────────────────────────────
 
-function TaskColumn({ column, tasks, members, onCardClick, onDragStart, onDrop, onAddTask }) {
+function TaskColumn({ column, tasks, members, onCardClick, onDragStart, onDrop, onAddTask, fullWidth }) {
   const [dragOver, setDragOver] = useState(false);
 
   return (
     <div
-      style={{ width: 275, flexShrink: 0, display: 'flex', flexDirection: 'column' }}
+      style={{ width: fullWidth ? '100%' : 275, flexShrink: 0, display: 'flex', flexDirection: 'column' }}
       onDragOver={e => { e.preventDefault(); setDragOver(true); }}
       onDragLeave={() => setDragOver(false)}
       onDrop={e => { e.preventDefault(); setDragOver(false); onDrop(e, column.id); }}
@@ -226,17 +238,18 @@ function TaskColumn({ column, tasks, members, onCardClick, onDragStart, onDrop, 
 // ─── Role Manager Modal ────────────────────────────────────────
 
 function RoleManagerModal({ roles, onClose, onSave, onDelete }) {
+  const isMobile = useIsMobile();
   const [newRole, setNewRole] = useState('');
   const [editId, setEditId] = useState(null);
   const [editLabel, setEditLabel] = useState('');
 
   return (
     <div
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 9999, display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center' }}
       onClick={onClose}
     >
       <div
-        style={{ background: '#111', border: '1px solid rgba(255,255,255,0.1)', width: 400, maxHeight: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+        style={{ background: '#111', border: '1px solid rgba(255,255,255,0.1)', width: isMobile ? '100%' : 400, maxHeight: '80vh', borderRadius: isMobile ? '12px 12px 0 0' : 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
         onClick={e => e.stopPropagation()}
       >
         <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -435,6 +448,7 @@ function TeamSidebar({ members, roles, memberRoles, onRoleToggle, onOpenRoleMana
 // ─── Task Modal ────────────────────────────────────────────────
 
 function TaskModal({ task, members, onClose, onSave, onDelete }) {
+  const isMobile = useIsMobile();
   const isNew = !task?.id;
   const [form, setForm] = useState({
     title: task?.title || '',
@@ -481,11 +495,11 @@ function TaskModal({ task, members, onClose, onSave, onDelete }) {
 
   return (
     <div
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9998, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9998, display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? 0 : 24 }}
       onClick={onClose}
     >
       <div
-        style={{ background: '#111', border: '1px solid rgba(255,255,255,0.1)', width: '100%', maxWidth: 580, maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+        style={{ background: '#111', border: '1px solid rgba(255,255,255,0.1)', width: '100%', maxWidth: isMobile ? '100%' : 580, maxHeight: isMobile ? '95vh' : '90vh', borderRadius: isMobile ? '12px 12px 0 0' : 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -537,7 +551,7 @@ function TaskModal({ task, members, onClose, onSave, onDelete }) {
           </div>
 
           {/* Status / Priority / Due Date */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 12 }}>
             <div>
               <label style={fieldLabel}>Status</label>
               <select value={form.status} onChange={e => set('status', e.target.value)} style={{ ...input, cursor: 'pointer' }}>
@@ -675,6 +689,7 @@ function TaskModal({ task, members, onClose, onSave, onDelete }) {
 // ─── Main Page ─────────────────────────────────────────────────
 
 export default function Tasks() {
+  const isMobile = useIsMobile();
   const [tasks,       setTasks]       = useState([]);
   const [members,     setMembers]     = useState([]);
   const [roles,       setRoles]       = useState([]);
@@ -685,6 +700,9 @@ export default function Tasks() {
   const [filterMember,   setFilterMember]   = useState(null);
   const [filterPriority, setFilterPriority] = useState('');
   const [search,         setSearch]         = useState('');
+  const [activeCol,      setActiveCol]      = useState('in_progress');
+  const [showFilters,    setShowFilters]    = useState(false);
+  const [showSidebar,    setShowSidebar]    = useState(false);
 
   const dragId = useRef(null);
 
@@ -792,102 +810,250 @@ export default function Tasks() {
     return new Date(y, m - 1, d) < new Date(new Date().setHours(0, 0, 0, 0));
   }).length;
 
+  const hasFilters = filterMember || filterPriority || search;
+
   return (
     <div style={{ minHeight: '100vh', background: '#080808', display: 'flex', flexDirection: 'column' }}>
       <AdminNavbar />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', height: 'calc(100vh - 65px)' }}>
 
-        {/* Page Header */}
-        <div style={{ padding: '16px 24px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
-          <div style={{ marginRight: 8 }}>
-            <h1 style={{ margin: 0, fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.75rem', color: '#fff', letterSpacing: '0.06em', lineHeight: 1 }}>Tasks</h1>
-            <p style={{ margin: '3px 0 0', fontFamily: "'Space Mono', monospace", fontSize: 9, color: '#444' }}>
-              {tasks.length} total · {inProgress} in progress{overdue > 0 ? ` · ` : ''}
-              {overdue > 0 && <span style={{ color: '#ef4444' }}>{overdue} overdue</span>}
-            </p>
+        {/* ── Page Header ── */}
+        <div style={{ padding: isMobile ? '12px 16px' : '16px 24px', borderBottom: '1px solid rgba(255,255,255,0.05)', flexShrink: 0 }}>
+
+          {/* Top row — always visible */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <h1 style={{ margin: 0, fontFamily: "'Bebas Neue', sans-serif", fontSize: isMobile ? '1.4rem' : '1.75rem', color: '#fff', letterSpacing: '0.06em', lineHeight: 1 }}>Tasks</h1>
+              <p style={{ margin: '2px 0 0', fontFamily: "'Space Mono', monospace", fontSize: 9, color: '#444' }}>
+                {tasks.length} total · {inProgress} in progress{overdue > 0 ? ' · ' : ''}
+                {overdue > 0 && <span style={{ color: '#ef4444' }}>{overdue} overdue</span>}
+              </p>
+            </div>
+
+            {/* Mobile: filter toggle + team + new task */}
+            {isMobile ? (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <button
+                  onClick={() => setShowFilters(v => !v)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 4,
+                    background: hasFilters ? 'rgba(255,85,0,0.12)' : 'none',
+                    border: `1px solid ${hasFilters ? 'rgba(255,85,0,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                    color: hasFilters ? '#ff5500' : '#555', cursor: 'pointer',
+                    padding: '8px 10px', borderRadius: 2,
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 17 }}>
+                    {hasFilters ? 'filter_alt' : 'tune'}
+                  </span>
+                </button>
+                <button
+                  onClick={() => setShowSidebar(true)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: '1px solid rgba(255,255,255,0.08)', color: '#555', cursor: 'pointer', padding: '8px 10px', borderRadius: 2 }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 17 }}>group</span>
+                </button>
+                <button
+                  onClick={() => setModalTask({})}
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#ff5500', border: 'none', color: '#fff', padding: '9px 14px', cursor: 'pointer', fontFamily: "'Space Mono', monospace", fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 15 }}>add</span>
+                  New
+                </button>
+              </div>
+            ) : (
+              /* Desktop: inline controls */
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                {/* Search */}
+                <div style={{ position: 'relative' }}>
+                  <span className="material-symbols-outlined" style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 15, color: '#333', pointerEvents: 'none' }}>search</span>
+                  <input
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    placeholder="Search tasks…"
+                    style={{ background: '#111', border: '1px solid rgba(255,255,255,0.07)', color: '#e5e2e1', fontSize: 12, padding: '7px 12px 7px 30px', outline: 'none', fontFamily: "'DM Sans', sans-serif", width: 190 }}
+                  />
+                </div>
+
+                {/* Member filter */}
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  {members.map(m => (
+                    <button
+                      key={m.id}
+                      onClick={() => setFilterMember(filterMember === m.id ? null : m.id)}
+                      title={m.name}
+                      style={{ padding: 2, border: `2px solid ${filterMember === m.id ? m.color : 'transparent'}`, borderRadius: 4, background: 'none', cursor: 'pointer', opacity: filterMember && filterMember !== m.id ? 0.25 : 1, transition: 'all 0.15s' }}
+                    >
+                      <Avatar member={m} size={26} />
+                    </button>
+                  ))}
+                </div>
+
+                {/* Priority filter */}
+                <select
+                  value={filterPriority}
+                  onChange={e => setFilterPriority(e.target.value)}
+                  style={{ background: '#111', border: '1px solid rgba(255,255,255,0.07)', color: '#555', fontSize: 10, padding: '7px 10px', outline: 'none', fontFamily: "'Space Mono', monospace", cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em' }}
+                >
+                  <option value="">All priorities</option>
+                  {PRIORITIES.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+                </select>
+
+                {/* Clear filters */}
+                {hasFilters && (
+                  <button
+                    onClick={() => { setFilterMember(null); setFilterPriority(''); setSearch(''); }}
+                    style={{ background: 'none', border: '1px solid rgba(255,255,255,0.07)', color: '#555', cursor: 'pointer', padding: '6px 10px', fontFamily: "'Space Mono', monospace", fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 4 }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 13 }}>filter_alt_off</span>
+                    Clear
+                  </button>
+                )}
+
+                {/* New Task */}
+                <button
+                  onClick={() => setModalTask({})}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#ff5500', border: 'none', color: '#fff', padding: '8px 16px', cursor: 'pointer', fontFamily: "'Space Mono', monospace", fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 15 }}>add</span>
+                  New Task
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Search */}
-          <div style={{ position: 'relative' }}>
-            <span className="material-symbols-outlined" style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 15, color: '#333', pointerEvents: 'none' }}>search</span>
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search tasks…"
-              style={{ background: '#111', border: '1px solid rgba(255,255,255,0.07)', color: '#e5e2e1', fontSize: 12, padding: '7px 12px 7px 30px', outline: 'none', fontFamily: "'DM Sans', sans-serif", width: 190 }}
-            />
-          </div>
+          {/* Mobile filter drawer */}
+          {isMobile && showFilters && (
+            <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10, padding: '12px', background: '#111', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 4 }}>
+              {/* Search */}
+              <div style={{ position: 'relative' }}>
+                <span className="material-symbols-outlined" style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 15, color: '#333', pointerEvents: 'none' }}>search</span>
+                <input
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Search tasks…"
+                  style={{ width: '100%', background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.07)', color: '#e5e2e1', fontSize: 13, padding: '9px 12px 9px 30px', outline: 'none', fontFamily: "'DM Sans', sans-serif", boxSizing: 'border-box' }}
+                />
+              </div>
 
-          {/* Member filter */}
-          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-            {members.map(m => (
-              <button
-                key={m.id}
-                onClick={() => setFilterMember(filterMember === m.id ? null : m.id)}
-                title={m.name}
-                style={{
-                  padding: 2, border: `2px solid ${filterMember === m.id ? m.color : 'transparent'}`,
-                  borderRadius: 4, background: 'none', cursor: 'pointer',
-                  opacity: filterMember && filterMember !== m.id ? 0.25 : 1,
-                  transition: 'all 0.15s',
-                }}
-              >
-                <Avatar member={m} size={26} />
-              </button>
-            ))}
-          </div>
+              {/* Member filter */}
+              {members.length > 0 && (
+                <div>
+                  <p style={{ margin: '0 0 6px', fontFamily: "'Space Mono', monospace", fontSize: 9, color: '#444', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Assignee</p>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {members.map(m => (
+                      <button
+                        key={m.id}
+                        onClick={() => setFilterMember(filterMember === m.id ? null : m.id)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 6,
+                          padding: '6px 10px',
+                          background: filterMember === m.id ? `${m.color}18` : '#0a0a0a',
+                          border: `1px solid ${filterMember === m.id ? m.color + '60' : 'rgba(255,255,255,0.08)'}`,
+                          color: filterMember === m.id ? m.color : '#666',
+                          cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", fontSize: 12,
+                        }}
+                      >
+                        <Avatar member={m} size={18} />
+                        {m.name.split(' ')[0]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-          {/* Priority filter */}
-          <select
-            value={filterPriority}
-            onChange={e => setFilterPriority(e.target.value)}
-            style={{ background: '#111', border: '1px solid rgba(255,255,255,0.07)', color: '#555', fontSize: 10, padding: '7px 10px', outline: 'none', fontFamily: "'Space Mono', monospace", cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em' }}
-          >
-            <option value="">All priorities</option>
-            {PRIORITIES.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
-          </select>
+              {/* Priority filter */}
+              <div>
+                <p style={{ margin: '0 0 6px', fontFamily: "'Space Mono', monospace", fontSize: 9, color: '#444', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Priority</p>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {[{ id: '', label: 'All' }, ...PRIORITIES].map(p => (
+                    <button
+                      key={p.id}
+                      onClick={() => setFilterPriority(p.id)}
+                      style={{
+                        padding: '6px 12px',
+                        background: filterPriority === p.id ? 'rgba(255,85,0,0.12)' : '#0a0a0a',
+                        border: `1px solid ${filterPriority === p.id ? 'rgba(255,85,0,0.4)' : 'rgba(255,255,255,0.07)'}`,
+                        color: filterPriority === p.id ? '#ff5500' : '#555',
+                        cursor: 'pointer', fontFamily: "'Space Mono', monospace", fontSize: 10,
+                        textTransform: 'uppercase', letterSpacing: '0.06em',
+                      }}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-          {/* Clear filters */}
-          {(filterMember || filterPriority || search) && (
-            <button
-              onClick={() => { setFilterMember(null); setFilterPriority(''); setSearch(''); }}
-              style={{ background: 'none', border: '1px solid rgba(255,255,255,0.07)', color: '#555', cursor: 'pointer', padding: '6px 10px', fontFamily: "'Space Mono', monospace", fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 4, transition: 'all 0.15s' }}
-              onMouseEnter={e => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'; }}
-              onMouseLeave={e => { e.currentTarget.style.color = '#555'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; }}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 13 }}>filter_alt_off</span>
-              Clear
-            </button>
+              {hasFilters && (
+                <button
+                  onClick={() => { setFilterMember(null); setFilterPriority(''); setSearch(''); }}
+                  style={{ alignSelf: 'flex-start', background: 'none', border: '1px solid rgba(255,255,255,0.07)', color: '#555', cursor: 'pointer', padding: '6px 10px', fontFamily: "'Space Mono', monospace", fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 4 }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 13 }}>filter_alt_off</span>
+                  Clear filters
+                </button>
+              )}
+            </div>
           )}
-
-          <div style={{ flex: 1 }} />
-
-          {/* New Task */}
-          <button
-            onClick={() => setModalTask({})}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6, background: '#ff5500', border: 'none', color: '#fff',
-              padding: '8px 16px', cursor: 'pointer', fontFamily: "'Space Mono', monospace", fontSize: 10,
-              textTransform: 'uppercase', letterSpacing: '0.08em', transition: 'transform 0.1s, box-shadow 0.1s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.02)'; e.currentTarget.style.boxShadow = '0 0 20px rgba(255,85,0,0.3)'; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = 'none'; }}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: 15 }}>add</span>
-            New Task
-          </button>
         </div>
 
-        {/* Board + Sidebar */}
+        {/* ── Mobile column tab bar ── */}
+        {isMobile && (
+          <div style={{ display: 'flex', overflowX: 'auto', borderBottom: '1px solid rgba(255,255,255,0.05)', flexShrink: 0, scrollbarWidth: 'none' }}>
+            {COLUMNS.map(col => {
+              const count = byCol[col.id]?.length ?? 0;
+              const active = activeCol === col.id;
+              return (
+                <button
+                  key={col.id}
+                  onClick={() => setActiveCol(col.id)}
+                  style={{
+                    padding: '10px 14px', border: 'none', background: 'none',
+                    color: active ? col.color : '#444',
+                    borderBottom: `2px solid ${active ? col.color : 'transparent'}`,
+                    fontFamily: "'Space Mono', monospace", fontSize: 9,
+                    textTransform: 'uppercase', letterSpacing: '0.1em',
+                    cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap',
+                    transition: 'color 0.15s',
+                  }}
+                >
+                  {col.label}
+                  {count > 0 && (
+                    <span style={{ marginLeft: 5, fontSize: 9, color: active ? col.color : '#333' }}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── Board + Sidebar ── */}
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-          {/* Kanban */}
-          <div style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', padding: '20px 24px' }}>
+
+          {/* Kanban board */}
+          <div style={{ flex: 1, overflowX: isMobile ? 'hidden' : 'auto', overflowY: 'auto', padding: isMobile ? '16px' : '20px 24px' }}>
             {loading ? (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 160, color: '#333', fontFamily: "'Space Mono', monospace", fontSize: 11 }}>
                 Loading…
               </div>
+            ) : isMobile ? (
+              /* Mobile: single active column */
+              <TaskColumn
+                column={COLUMNS.find(c => c.id === activeCol) || COLUMNS[0]}
+                tasks={byCol[activeCol] || []}
+                members={members}
+                onCardClick={setModalTask}
+                onDragStart={handleDragStart}
+                onDrop={handleDrop}
+                onAddTask={status => setModalTask({ status })}
+                fullWidth
+              />
             ) : (
+              /* Desktop: horizontal scroll with all columns */
               <div style={{ display: 'flex', gap: 18, alignItems: 'flex-start', minWidth: 'max-content' }}>
                 {COLUMNS.map(col => (
                   <TaskColumn
@@ -905,16 +1071,45 @@ export default function Tasks() {
             )}
           </div>
 
-          {/* Sidebar */}
-          <TeamSidebar
-            members={members}
-            roles={roles}
-            memberRoles={memberRoles}
-            onRoleToggle={handleRoleToggle}
-            onOpenRoleManager={() => setShowRoles(true)}
-          />
+          {/* Desktop sidebar — always visible */}
+          {!isMobile && (
+            <TeamSidebar
+              members={members}
+              roles={roles}
+              memberRoles={memberRoles}
+              onRoleToggle={handleRoleToggle}
+              onOpenRoleManager={() => setShowRoles(true)}
+            />
+          )}
         </div>
       </div>
+
+      {/* Mobile sidebar overlay */}
+      {isMobile && showSidebar && (
+        <>
+          <div
+            onClick={() => setShowSidebar(false)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 200 }}
+          />
+          <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: '80vw', maxWidth: 320, zIndex: 201, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0c0c0c' }}>
+              <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: '#444', textTransform: 'uppercase', letterSpacing: '0.14em' }}>Team</span>
+              <button onClick={() => setShowSidebar(false)} style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', display: 'flex' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
+              </button>
+            </div>
+            <div style={{ flex: 1, overflow: 'hidden' }}>
+              <TeamSidebar
+                members={members}
+                roles={roles}
+                memberRoles={memberRoles}
+                onRoleToggle={handleRoleToggle}
+                onOpenRoleManager={() => { setShowSidebar(false); setShowRoles(true); }}
+              />
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Modals */}
       <AnimatePresence>

@@ -15,7 +15,7 @@ const DEFAULT_MATERIALS = [
 ];
 
 const DEFAULT_SETTINGS = {
-  electricity_rate:           0.12,
+  electricity_rate:           7,
   support_material_factor:    15,
   startup_spike_watts:        300,
   startup_duration_mins:      5,

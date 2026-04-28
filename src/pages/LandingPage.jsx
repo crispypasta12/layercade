@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { getFeaturedProducts, getNewArrivals } from '../data/products';
 import { FloatingPaths } from '@/components/ui/background-paths';
 import ProductCard, { fadeUp } from '../components/ProductCard';
-import { useCategories } from '../lib/useCategories';
 import ParallaxSection from '@/components/ui/parallax-section';
 
 /* ─── Constants ──────────────────────────────────────────────── */
@@ -59,7 +57,7 @@ const stagger = {
 
 export default function LandingPage() {
   const location = useLocation();
-  const { categories: allCategories } = useCategories();
+  const [allCategories, setAllCategories] = useState([]);
 
   /* Typewriter */
   const [twText,    setTwText]    = useState('');
@@ -92,12 +90,34 @@ export default function LandingPage() {
   const [loading,          setLoading]          = useState(true);
 
   useEffect(() => {
-    Promise.all([getFeaturedProducts(), getNewArrivals()])
-      .then(([featured, arrivals]) => {
+    let active = true;
+
+    Promise.all([
+      import('../data/products'),
+      import('../lib/supabase'),
+    ])
+      .then(async ([productsModule, { supabase }]) => {
+        const [featured, arrivals, { data: categories }] = await Promise.all([
+          productsModule.getFeaturedProducts(),
+          productsModule.getNewArrivals(),
+          supabase
+            .from('categories')
+            .select('id, name, slug, sort_order, image_url')
+            .order('sort_order', { ascending: true }),
+        ]);
+
+        if (!active) return;
         setFeaturedProducts(featured);
         setNewProducts(arrivals);
+        setAllCategories(categories ?? []);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   /* Best Sellers category filter (applied to fetched featured products) */
@@ -110,16 +130,6 @@ export default function LandingPage() {
 
   /* FAQ */
   const [openFaq, setOpenFaq] = useState(null);
-
-  if (loading) {
-    return (
-      <main className="min-h-screen bg-[#080808] flex items-center justify-center">
-        <p className="font-headline text-2xl text-white uppercase tracking-wider">
-          Loading products...
-        </p>
-      </main>
-    );
-  }
 
   return (
     <main>
@@ -137,6 +147,8 @@ export default function LandingPage() {
           <img
             src="/logo.png"
             alt="Layercade"
+            fetchPriority="high"
+            decoding="async"
             className="relative w-full h-full object-contain drop-shadow-[0_0_40px_rgba(255,85,0,0.5)]"
           />
         </div>
@@ -253,6 +265,8 @@ export default function LandingPage() {
                     <img
                       src={cat.image_url}
                       alt={cat.name}
+                      loading="lazy"
+                      decoding="async"
                       className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/20" />
@@ -357,9 +371,13 @@ export default function LandingPage() {
             initial="hidden"
             animate="show"
           >
-            {filtered.map((product) => (
-              <ProductCard key={product.id} product={product} location={location} />
-            ))}
+            {loading
+              ? Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="aspect-[3/4] bg-[#161616] border border-white/5 animate-pulse" />
+                ))
+              : filtered.map((product) => (
+                  <ProductCard key={product.id} product={product} location={location} />
+                ))}
           </motion.div>
 
           {/* CTA */}
@@ -397,9 +415,13 @@ export default function LandingPage() {
           whileInView="show"
           viewport={{ once: true, margin: '-60px' }}
         >
-          {newProducts.map((product) => (
-            <ProductCard key={product.id} product={product} location={location} />
-          ))}
+          {loading
+            ? Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="aspect-[3/4] bg-[#161616] border border-white/5 animate-pulse" />
+              ))
+            : newProducts.map((product) => (
+                <ProductCard key={product.id} product={product} location={location} />
+              ))}
         </motion.div>
       </section>
 

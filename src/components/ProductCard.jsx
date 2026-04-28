@@ -64,11 +64,15 @@ export default function ProductCard({ product, location }) {
               <img
                 src={product.img1}
                 alt={product.name}
+                loading="lazy"
+                decoding="async"
                 className="w-full h-full object-cover transition-opacity duration-500 group-hover:opacity-0"
               />
               <img
                 src={product.img2}
                 alt={`${product.name} detail`}
+                loading="lazy"
+                decoding="async"
                 className="absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-500 group-hover:opacity-100"
               />
             </>

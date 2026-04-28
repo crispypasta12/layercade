@@ -1,30 +1,35 @@
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { SpeedInsights } from '@vercel/speed-insights/react';
-import { useEffect } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import AnnouncementBar from './components/AnnouncementBar';
 import Navbar          from './components/Navbar';
 import Footer          from './components/Footer';
 import WhatsAppButton  from './components/WhatsAppButton';
 import ProtectedRoute  from './components/ProtectedRoute';
-import LandingPage     from './pages/LandingPage';
-import Gallery         from './pages/Gallery';
-import GetAQuote       from './pages/GetAQuote';
-import Materials       from './pages/Materials';
-import Process         from './pages/Process';
-import ProductModalPage from './pages/ProductModalPage';
-import ShopPage          from './pages/ShopPage';
-import Checkout           from './pages/Checkout';
-import OrderConfirmation  from './pages/OrderConfirmation';
-import AdminLogin         from './pages/admin/Login';
-import AdminDashboard     from './pages/admin/Dashboard';
-import AdminOrders        from './pages/admin/Orders';
-import AdminProducts      from './pages/admin/Products';
-import AdminCategories    from './pages/admin/Categories';
-import CostCalculator    from './pages/admin/CostCalculator';
-import InvoiceMaker     from './pages/admin/InvoiceMaker';
-import AdminTasks       from './pages/admin/Tasks';
-import AdminExpenses    from './pages/admin/Expenses';
+
+const LandingPage = lazy(() => import('./pages/LandingPage'));
+const Gallery = lazy(() => import('./pages/Gallery'));
+const GetAQuote = lazy(() => import('./pages/GetAQuote'));
+const Materials = lazy(() => import('./pages/Materials'));
+const Process = lazy(() => import('./pages/Process'));
+const ProductModalPage = lazy(() => import('./pages/ProductModalPage'));
+const ShopPage = lazy(() => import('./pages/ShopPage'));
+const Checkout = lazy(() => import('./pages/Checkout'));
+const OrderConfirmation = lazy(() => import('./pages/OrderConfirmation'));
+const AdminLogin = lazy(() => import('./pages/admin/Login'));
+const AdminDashboard = lazy(() => import('./pages/admin/Dashboard'));
+const AdminOrders = lazy(() => import('./pages/admin/Orders'));
+const AdminProducts = lazy(() => import('./pages/admin/Products'));
+const AdminCategories = lazy(() => import('./pages/admin/Categories'));
+const CostCalculator = lazy(() => import('./pages/admin/CostCalculator'));
+const InvoiceMaker = lazy(() => import('./pages/admin/InvoiceMaker'));
+const AdminTasks = lazy(() => import('./pages/admin/Tasks'));
+const AdminExpenses = lazy(() => import('./pages/admin/Expenses'));
+
+function RouteFallback() {
+  return <div className="min-h-screen bg-[#080808]" />;
+}
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -45,25 +50,27 @@ function Layout() {
       <AnnouncementBar />
       <Navbar />
       <ScrollToTop />
-      <Routes location={backgroundLocation || location}>
-        <Route path="/"          element={<LandingPage />} />
-        <Route path="/gallery"   element={<Gallery />} />
-        <Route path="/quote"     element={<GetAQuote />} />
-        <Route path="/materials" element={<Materials />} />
-        <Route path="/process"   element={<Process />} />
-        <Route path="/products/:slug" element={<ProductModalPage />} />
-        <Route path="/shop"               element={<ShopPage />} />
-        <Route path="/shop/:categorySlug" element={<ShopPage />} />
-        <Route path="/checkout"            element={<Checkout />} />
-        <Route path="/order-confirmation" element={<OrderConfirmation />} />
-      </Routes>
-      <AnimatePresence>
-        {backgroundLocation && (
-          <Routes location={location} key={location.pathname}>
-            <Route path="/products/:slug" element={<ProductModalPage />} />
-          </Routes>
-        )}
-      </AnimatePresence>
+      <Suspense fallback={<RouteFallback />}>
+        <Routes location={backgroundLocation || location}>
+          <Route path="/"          element={<LandingPage />} />
+          <Route path="/gallery"   element={<Gallery />} />
+          <Route path="/quote"     element={<GetAQuote />} />
+          <Route path="/materials" element={<Materials />} />
+          <Route path="/process"   element={<Process />} />
+          <Route path="/products/:slug" element={<ProductModalPage />} />
+          <Route path="/shop"               element={<ShopPage />} />
+          <Route path="/shop/:categorySlug" element={<ShopPage />} />
+          <Route path="/checkout"            element={<Checkout />} />
+          <Route path="/order-confirmation" element={<OrderConfirmation />} />
+        </Routes>
+        <AnimatePresence>
+          {backgroundLocation && (
+            <Routes location={location} key={location.pathname}>
+              <Route path="/products/:slug" element={<ProductModalPage />} />
+            </Routes>
+          )}
+        </AnimatePresence>
+      </Suspense>
       <Footer />
       <WhatsAppButton />
     </div>
@@ -74,6 +81,7 @@ export default function App() {
   return (
     <>
     <BrowserRouter>
+      <Suspense fallback={<RouteFallback />}>
       <Routes>
         {/* Admin routes — no site chrome */}
         <Route path="/admin/login" element={<AdminLogin />} />
@@ -145,6 +153,7 @@ export default function App() {
         {/* Main site */}
         <Route path="/*" element={<Layout />} />
       </Routes>
+      </Suspense>
     </BrowserRouter>
     <SpeedInsights />
     </>

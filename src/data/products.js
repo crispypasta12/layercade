@@ -6,6 +6,9 @@
 import { parseProductImages } from '../lib/productImages';
 import { supabase } from '../lib/supabase';
 
+const PRODUCT_CARD_COLUMNS =
+  'id, name, slug, description, price, category, image, images, featured, new_arrival, stock_status, sort_order';
+
 // ─── Shape adapter ───────────────────────────────────────────────────────────
 // Converts a raw Supabase row into the shape used by existing components.
 function toProduct(row) {
@@ -67,7 +70,7 @@ export async function fetchProducts() {
 export async function getFeaturedProducts() {
   const { data, error } = await supabase
     .from('products')
-    .select('*')
+    .select(PRODUCT_CARD_COLUMNS)
     .eq('featured', true)
     .order('sort_order', { ascending: true });
 
@@ -82,7 +85,7 @@ export async function getFeaturedProducts() {
 export async function getNewArrivals() {
   const { data, error } = await supabase
     .from('products')
-    .select('*')
+    .select(PRODUCT_CARD_COLUMNS)
     .eq('new_arrival', true)
     .order('sort_order', { ascending: true })
     .limit(3);

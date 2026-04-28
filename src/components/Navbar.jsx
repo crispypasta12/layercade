@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { Suspense, lazy, useState, useEffect, useRef } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { useCartStore } from '../store/cartStore';
-import CartDrawer from './CartDrawer';
-import SearchOverlay from './SearchOverlay';
-import { supabase } from '../lib/supabase';
+
+const SearchOverlay = lazy(() => import('./SearchOverlay'));
+const CartDrawer = lazy(() => import('./CartDrawer'));
 
 const navLinks = [
   { label: 'Shop',         to: '/shop' },
@@ -22,7 +22,7 @@ export default function Navbar() {
   const [adminVisible,   setAdminVisible]   = useState(false);
   const [pendingCount,   setPendingCount]   = useState(0);
   const logoClickTimer = useRef(null);
-  const { openCart, items } = useCartStore();
+  const { isCartOpen, openCart, items } = useCartStore();
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
 
   useEffect(() => {
@@ -54,11 +54,21 @@ export default function Navbar() {
   // Fetch pending order count once admin link is revealed
   useEffect(() => {
     if (!adminVisible) return;
-    supabase
-      .from('orders')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'pending')
-      .then(({ count }) => setPendingCount(count ?? 0));
+    let active = true;
+
+    import('../lib/supabase').then(({ supabase }) => {
+      supabase
+        .from('orders')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'pending')
+        .then(({ count }) => {
+          if (active) setPendingCount(count ?? 0);
+        });
+    });
+
+    return () => {
+      active = false;
+    };
   }, [adminVisible]);
 
   // 5-click logo easter egg
@@ -263,9 +273,17 @@ export default function Navbar() {
         </Link>
       </div>
     </nav>
-    <CartDrawer />
+    {isCartOpen && (
+      <Suspense fallback={null}>
+        <CartDrawer />
+      </Suspense>
+    )}
     <AnimatePresence>
-      {searchOpen && <SearchOverlay onClose={() => setSearchOpen(false)} />}
+      {searchOpen && (
+        <Suspense fallback={null}>
+          <SearchOverlay onClose={() => setSearchOpen(false)} />
+        </Suspense>
+      )}
     </AnimatePresence>
     </>
   );

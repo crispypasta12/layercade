@@ -128,9 +128,18 @@ export default function ProductModalPage() {
     );
   }
 
-  const productImages = resolvedProduct.images?.length
-    ? resolvedProduct.images
-    : [...new Set([resolvedProduct.img1, resolvedProduct.img2].filter(Boolean))];
+  // Base images are always the product's own images, regardless of which color is selected.
+  const baseImages = product.images?.length
+    ? product.images
+    : [product.img1, product.img2].filter(Boolean);
+
+  // When a color is selected its image is prepended to the strip (if not already present),
+  // so users can click any base thumbnail to browse back without losing the color image.
+  const variantImage = resolvedProduct.activeVariant ? (resolvedProduct.images?.[0] ?? null) : null;
+  const productImages = variantImage && !baseImages.includes(variantImage)
+    ? [variantImage, ...baseImages]
+    : (baseImages.length ? baseImages : [product.img1].filter(Boolean));
+
   const activeImage = selectedImage ?? productImages[0] ?? null;
   const activeVariants = product.has_color_variants
     ? product.colorVariants.filter((v) => v.is_active)

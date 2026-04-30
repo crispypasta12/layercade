@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
+import { resolveProductView } from '../data/products';
 import { useCartStore } from '../store/cartStore';
 
 export const fadeUp = {
@@ -25,13 +26,15 @@ export default function ProductCard({ product, location }) {
   const handleAddToCart = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    const color = product.has_color_variants && product.colorVariants?.length
-      ? (() => {
-          const v = product.colorVariants.find((c) => c.is_active) ?? null;
-          return v ? { id: v.id, name: v.name, hex: v.hex } : null;
-        })()
+    const resolvedProduct = resolveProductView(product);
+    const color = resolvedProduct.activeVariant
+      ? {
+          id: resolvedProduct.activeVariant.id,
+          name: resolvedProduct.activeVariant.name,
+          hex: resolvedProduct.activeVariant.hex,
+        }
       : null;
-    addItem(product, 1, color);
+    addItem(resolvedProduct, 1, color);
     openCart();
   };
 

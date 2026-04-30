@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useCartStore } from '../store/cartStore';
+import { getCartLineKey, useCartStore } from '../store/cartStore';
 
 export default function CartDrawer() {
   const { isCartOpen, closeCart, items, removeItem, updateQuantity } = useCartStore();
@@ -92,9 +92,11 @@ export default function CartDrawer() {
                   </p>
                 </div>
               ) : (
-                items.map((item) => (
+                items.map((item) => {
+                  const lineKey = getCartLineKey(item);
+                  return (
                   <div
-                    key={item.lineKey ?? item.productId}
+                    key={lineKey}
                     className="flex gap-3 bg-[#161616] p-3 border border-white/5"
                   >
                     {/* Thumbnail */}
@@ -138,7 +140,7 @@ export default function CartDrawer() {
                       {/* Qty controls */}
                       <div className="flex items-center gap-2 mt-2">
                         <button
-                          onClick={() => updateQuantity(item.lineKey, item.quantity - 1)}
+                          onClick={() => updateQuantity(lineKey, item.quantity - 1)}
                           className="w-7 h-7 bg-stone-800 hover:bg-[#ff5500] text-white flex items-center justify-center transition-colors flex-shrink-0"
                           aria-label="Decrease quantity"
                         >
@@ -148,7 +150,7 @@ export default function CartDrawer() {
                           {item.quantity}
                         </span>
                         <button
-                          onClick={() => updateQuantity(item.lineKey, item.quantity + 1)}
+                          onClick={() => updateQuantity(lineKey, item.quantity + 1)}
                           className="w-7 h-7 bg-stone-800 hover:bg-[#ff5500] text-white flex items-center justify-center transition-colors flex-shrink-0"
                           aria-label="Increase quantity"
                         >
@@ -160,7 +162,7 @@ export default function CartDrawer() {
                     {/* Line total + remove */}
                     <div className="flex flex-col items-end justify-between flex-shrink-0">
                       <button
-                        onClick={() => removeItem(item.lineKey)}
+                        onClick={() => removeItem(lineKey)}
                         className="text-stone-600 hover:text-red-500 transition-colors"
                         aria-label="Remove item"
                       >
@@ -171,7 +173,8 @@ export default function CartDrawer() {
                       </span>
                     </div>
                   </div>
-                ))
+                  );
+                })
               )}
             </div>
 

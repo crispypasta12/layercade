@@ -23,9 +23,11 @@ serve(async (req) => {
 
     const itemsHtml = (order.items ?? [])
       .map(
-        (item: { name: string; quantity: number; price: number }) => `
+        (item: { name: string; quantity: number; price: number; colorName?: string }) => `
         <tr>
-          <td style="padding:8px 12px;border-bottom:1px solid #222;">${item.name}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #222;">
+            ${item.name}${item.colorName ? `<span style="display:block;font-size:10px;color:#888;margin-top:2px;">${item.colorName}</span>` : ''}
+          </td>
           <td style="padding:8px 12px;border-bottom:1px solid #222;text-align:center;">${item.quantity}</td>
           <td style="padding:8px 12px;border-bottom:1px solid #222;text-align:right;">৳${(item.price * item.quantity).toLocaleString('en-IN')}</td>
         </tr>`,
@@ -134,7 +136,7 @@ serve(async (req) => {
         </tr>
 
       </table>
-    </td></tr>new row violates row-level security policy for table "orders"
+    </td></tr>
   </table>
 </body>
 </html>`;

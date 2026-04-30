@@ -26,6 +26,7 @@ const CostCalculator = lazy(() => import('./pages/admin/CostCalculator'));
 const InvoiceMaker = lazy(() => import('./pages/admin/InvoiceMaker'));
 const AdminTasks = lazy(() => import('./pages/admin/Tasks'));
 const AdminExpenses = lazy(() => import('./pages/admin/Expenses'));
+const AdminColors   = lazy(() => import('./pages/admin/Colors'));
 
 function RouteFallback() {
   return <div className="min-h-screen bg-[#080808]" />;
@@ -146,6 +147,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <AdminExpenses />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/colors"
+          element={
+            <ProtectedRoute>
+              <AdminColors />
             </ProtectedRoute>
           }
         />

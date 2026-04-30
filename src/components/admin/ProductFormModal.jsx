@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { parseProductImages } from '../../lib/productImages';
 import { supabase } from '../../lib/supabase';
 import { useCategories } from '../../lib/useCategories';
+import { useColors } from '../../lib/useColors';
 
 const STOCK_OPTIONS = [
   { value: 'in_stock', label: 'In Stock' },
@@ -48,11 +49,229 @@ function Field({ label, error, children }) {
   );
 }
 
+function ColorSwatchPicker({ colors, selectedId, onSelect, onClose }) {
+  return (
+    <div
+      className="absolute z-50 top-full left-0 mt-1 bg-[#1c1c1c] border border-white/10 p-3 shadow-2xl"
+      style={{ minWidth: 218 }}
+    >
+      <p className="font-technical text-[9px] uppercase tracking-widest text-stone-600 mb-2">Pick from palette</p>
+      <div className="grid grid-cols-5 gap-1.5 mb-3">
+        {colors.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            onClick={() => { onSelect(c); onClose(); }}
+            title={c.name}
+            className={`w-8 h-8 border-2 transition-all ${
+              selectedId === c.id
+                ? 'border-[#ff5500] scale-110'
+                : 'border-transparent hover:border-white/40'
+            }`}
+            style={{ background: c.hex }}
+          />
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={onClose}
+        className="font-technical text-[9px] uppercase tracking-widest text-stone-600 hover:text-stone-300 transition-colors"
+      >
+        Close
+      </button>
+    </div>
+  );
+}
+
+function VariantRow({
+  variant, index, total, globalColors,
+  uploading, uploadProgress, uploadError,
+  onChange, onRemove, onMoveUp, onMoveDown, onImageUpload,
+  disabled,
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerRef = useRef(null);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const handler = (e) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target)) setPickerOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [pickerOpen]);
+
+  const safeHex = /^#[0-9a-fA-F]{6}$/.test(variant.hex) ? variant.hex : '#888888';
+
+  return (
+    <div className="border border-white/10 bg-[#0d0d0d] p-3 space-y-3">
+      {/* Swatch + name + reorder/remove */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-shrink-0" ref={pickerRef}>
+          <button
+            type="button"
+            onClick={() => !disabled && setPickerOpen((v) => !v)}
+            disabled={disabled}
+            title="Pick from global palette"
+            className="w-9 h-9 border border-white/10 hover:border-[#ff5500]/60 transition-colors flex-shrink-0"
+            style={{ background: safeHex }}
+          />
+          {pickerOpen && (
+            <ColorSwatchPicker
+              colors={globalColors}
+              selectedId={variant.color_id}
+              onSelect={(c) => onChange({ color_id: c.id, hex: c.hex, name: variant.name || c.name })}
+              onClose={() => setPickerOpen(false)}
+            />
+          )}
+        </div>
+
+        <input
+          type="text"
+          value={variant.name}
+          onChange={(e) => onChange({ name: e.target.value })}
+          placeholder="Color name (e.g. Matte Black)"
+          disabled={disabled}
+          className="flex-1 bg-[#161616] border border-white/10 text-white font-body text-sm px-3 py-2 focus:outline-none focus:border-[#ff5500] transition-colors placeholder:text-stone-700 min-w-0"
+        />
+
+        <div className="flex items-center gap-0.5 flex-shrink-0">
+          <button
+            type="button" onClick={onMoveUp} disabled={disabled || index === 0}
+            className="p-1 text-stone-600 hover:text-white transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 15 }}>arrow_upward</span>
+          </button>
+          <button
+            type="button" onClick={onMoveDown} disabled={disabled || index === total - 1}
+            className="p-1 text-stone-600 hover:text-white transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 15 }}>arrow_downward</span>
+          </button>
+          <button
+            type="button" onClick={onRemove} disabled={disabled}
+            className="p-1 text-stone-600 hover:text-red-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 15 }}>delete</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Custom hex */}
+      <div className="flex items-center gap-2">
+        <input
+          type="color"
+          value={safeHex}
+          onChange={(e) => onChange({ hex: e.target.value, color_id: null })}
+          disabled={disabled}
+          className="w-8 h-7 border-0 bg-transparent cursor-pointer p-0 flex-shrink-0"
+        />
+        <input
+          type="text"
+          value={variant.hex}
+          onChange={(e) => {
+            const val = e.target.value;
+            if (/^#?[0-9a-fA-F]{0,6}$/.test(val)) {
+              onChange({ hex: val.startsWith('#') ? val : '#' + val, color_id: null });
+            }
+          }}
+          disabled={disabled}
+          placeholder="#000000"
+          maxLength={7}
+          className="w-24 bg-[#161616] border border-white/10 text-stone-300 font-technical text-xs px-2 py-1 focus:outline-none focus:border-[#ff5500] transition-colors uppercase tracking-widest"
+        />
+        <span className="font-technical text-[9px] text-stone-600 uppercase tracking-widest">
+          custom hex · or tap swatch for palette
+        </span>
+      </div>
+
+      {/* Image + stock + price */}
+      <div className="flex items-start gap-3">
+        <div className="flex-shrink-0">
+          {variant.image ? (
+            <div className="relative w-14 h-14 border border-white/10">
+              <img src={variant.image} alt="" className="w-full h-full object-cover" />
+              <button
+                type="button"
+                onClick={() => onChange({ image: '', images: [] })}
+                disabled={disabled}
+                className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-600 hover:bg-red-500 text-white flex items-center justify-center transition-colors disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 10 }}>close</span>
+              </button>
+            </div>
+          ) : uploading ? (
+            <div className="w-14 h-14 border border-dashed border-white/20 flex flex-col items-center justify-center gap-1">
+              <svg className="animate-spin w-3.5 h-3.5 text-[#ff5500]" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+              </svg>
+              <span className="font-technical text-[9px] text-stone-500">{uploadProgress}%</span>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onImageUpload}
+              disabled={disabled}
+              className="w-14 h-14 border border-dashed border-white/20 hover:border-[#ff5500]/60 text-stone-600 hover:text-stone-400 flex flex-col items-center justify-center gap-0.5 transition-colors disabled:opacity-50"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>image</span>
+              <span className="font-technical text-[8px] uppercase tracking-widest">Photo</span>
+            </button>
+          )}
+          {uploadError && (
+            <p className="font-technical text-[8px] text-red-400 mt-1 w-14 leading-tight">{uploadError}</p>
+          )}
+        </div>
+
+        <div className="flex-1 grid grid-cols-2 gap-2 min-w-0">
+          <div>
+            <p className="font-technical text-[9px] text-stone-600 uppercase tracking-widest mb-1">Stock</p>
+            <div className="relative">
+              <select
+                value={variant.stock_status}
+                onChange={(e) => onChange({ stock_status: e.target.value })}
+                disabled={disabled}
+                className="w-full bg-[#161616] border border-white/10 text-white font-body text-xs px-2 py-2 focus:outline-none focus:border-[#ff5500] appearance-none cursor-pointer pr-6"
+              >
+                {STOCK_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value} className="bg-[#161616]">{o.label}</option>
+                ))}
+              </select>
+              <span
+                className="material-symbols-outlined absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-stone-500"
+                style={{ fontSize: 13 }}
+              >
+                expand_more
+              </span>
+            </div>
+          </div>
+          <div>
+            <p className="font-technical text-[9px] text-stone-600 uppercase tracking-widest mb-1">Price Override (BDT)</p>
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={variant.price}
+              onChange={(e) => onChange({ price: e.target.value })}
+              placeholder="—"
+              disabled={disabled}
+              className="w-full bg-[#161616] border border-white/10 text-white font-body text-xs px-2 py-2 focus:outline-none focus:border-[#ff5500] transition-colors placeholder:text-stone-700"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ProductFormModal({ product, onClose, onSuccess }) {
   const isEdit = product !== null;
   const initialImages = parseProductImages(product?.image, product?.images);
   const { categories } = useCategories();
+  const { colors: globalColors } = useColors();
 
+  // Product fields
   const [name, setName] = useState(product?.name ?? '');
   const [slug, setSlug] = useState(product?.slug ?? '');
   const [description, setDescription] = useState(product?.description ?? '');
@@ -64,10 +283,22 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
   const [newArrival, setNewArrival] = useState(product?.new_arrival ?? false);
   const [imageUrls, setImageUrls] = useState(initialImages);
 
+  // Product-level image upload
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
 
+  // Color variants
+  const [hasColorVariants, setHasColorVariants] = useState(product?.has_color_variants ?? false);
+  const [variants, setVariants] = useState([]);
+  const [originalVariantIds, setOriginalVariantIds] = useState([]);
+  const [variantUploading, setVariantUploading] = useState({});
+  const [variantUploadProgress, setVariantUploadProgress] = useState({});
+  const [variantUploadError, setVariantUploadError] = useState({});
+  const variantFileInputRef = useRef(null);
+  const [pendingVariantIdx, setPendingVariantIdx] = useState(null);
+
+  // Form state
   const [fieldErrors, setFieldErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
@@ -82,11 +313,140 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
 
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === 'Escape' && !saving && !uploading) onClose();
+      if (
+        e.key === 'Escape' &&
+        !saving &&
+        !uploading &&
+        !Object.values(variantUploading).some(Boolean)
+      ) {
+        onClose();
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, saving, uploading]);
+  }, [onClose, saving, uploading, variantUploading]);
+
+  // Load existing variants when editing
+  useEffect(() => {
+    if (!isEdit || !product?.id) return;
+    supabase
+      .from('product_colors')
+      .select('*')
+      .eq('product_id', product.id)
+      .order('sort_order', { ascending: true })
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          setVariants(
+            data.map((v) => ({
+              id: v.id,
+              color_id: v.color_id,
+              name: v.name,
+              hex: v.hex,
+              image: v.image,
+              images: v.images ?? [],
+              stock_status: v.stock_status,
+              price: v.price != null ? String(v.price) : '',
+              is_active: v.is_active,
+            }))
+          );
+          setOriginalVariantIds(data.map((v) => v.id));
+        }
+      });
+  }, [isEdit, product?.id]);
+
+  const addVariant = () => {
+    setVariants((prev) => [
+      ...prev,
+      {
+        id: null,
+        color_id: null,
+        name: '',
+        hex: '#888888',
+        image: '',
+        images: [],
+        stock_status: 'in_stock',
+        price: '',
+        is_active: true,
+      },
+    ]);
+  };
+
+  const updateVariant = (idx, patch) => {
+    setVariants((prev) => prev.map((v, i) => (i === idx ? { ...v, ...patch } : v)));
+  };
+
+  const removeVariant = (idx) => {
+    setVariants((prev) => prev.filter((_, i) => i !== idx));
+    setVariantUploading((prev) => { const n = { ...prev }; delete n[idx]; return n; });
+    setVariantUploadProgress((prev) => { const n = { ...prev }; delete n[idx]; return n; });
+    setVariantUploadError((prev) => { const n = { ...prev }; delete n[idx]; return n; });
+  };
+
+  const moveVariant = (from, to) => {
+    if (to < 0 || to >= variants.length) return;
+    setVariants((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  };
+
+  const handleVariantFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || pendingVariantIdx === null) return;
+    const idx = pendingVariantIdx;
+    setPendingVariantIdx(null);
+
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setVariantUploadError((prev) => ({ ...prev, [idx]: 'JPG, PNG or WebP only.' }));
+      return;
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      setVariantUploadError((prev) => ({ ...prev, [idx]: 'Max 5 MB.' }));
+      return;
+    }
+
+    setVariantUploadError((prev) => ({ ...prev, [idx]: null }));
+    setVariantUploading((prev) => ({ ...prev, [idx]: true }));
+    setVariantUploadProgress((prev) => ({ ...prev, [idx]: 0 }));
+
+    const folder = `layercade/products/${categoryToFolder(category)}/variants`;
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', UPLOAD_PRESET);
+    formData.append('folder', folder);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`);
+
+    xhr.upload.addEventListener('progress', (evt) => {
+      if (evt.lengthComputable) {
+        setVariantUploadProgress((prev) => ({
+          ...prev,
+          [idx]: Math.round((evt.loaded / evt.total) * 100),
+        }));
+      }
+    });
+
+    xhr.onload = () => {
+      setVariantUploading((prev) => ({ ...prev, [idx]: false }));
+      if (xhr.status === 200) {
+        const data = JSON.parse(xhr.responseText);
+        updateVariant(idx, { image: data.secure_url, images: [data.secure_url] });
+      } else {
+        setVariantUploadError((prev) => ({ ...prev, [idx]: 'Upload failed.' }));
+      }
+    };
+
+    xhr.onerror = () => {
+      setVariantUploading((prev) => ({ ...prev, [idx]: false }));
+      setVariantUploadError((prev) => ({ ...prev, [idx]: 'Network error.' }));
+    };
+
+    xhr.send(formData);
+  };
 
   const handleNameChange = (val) => {
     setName(val);
@@ -169,6 +529,10 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
     if (imageUrls.length > MAX_IMAGE_COUNT) {
       errors.image = `You can upload up to ${MAX_IMAGE_COUNT} images per product.`;
     }
+    if (hasColorVariants && variants.length > 0) {
+      const badIdx = variants.findIndex((v) => !v.name.trim());
+      if (badIdx >= 0) errors.variants = `Variant ${badIdx + 1} needs a color name.`;
+    }
     return errors;
   };
 
@@ -196,7 +560,10 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
       featured,
       new_arrival: newArrival,
       stock_status: stockStatus,
+      has_color_variants: hasColorVariants,
     };
+
+    let savedProductId;
 
     if (!isEdit) {
       const { data: existing } = await supabase
@@ -210,13 +577,17 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
         return;
       }
       row.sort_order = 999;
-      const { error } = await supabase.from('products').insert(row);
+      const { data: inserted, error } = await supabase
+        .from('products')
+        .insert(row)
+        .select('id')
+        .single();
       if (error) {
         setSaveError(error.message);
         setSaving(false);
         return;
       }
-      onSuccess('Product added successfully.');
+      savedProductId = inserted.id;
     } else {
       if (slug !== product.slug) {
         const { data: existing } = await supabase
@@ -236,21 +607,57 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
         setSaving(false);
         return;
       }
-      onSuccess('Product updated successfully.');
+      savedProductId = product.id;
     }
 
+    // Upsert variants
+    if (hasColorVariants && variants.length > 0) {
+      const variantRows = variants.map((v, i) => {
+        const vrow = {
+          product_id: savedProductId,
+          color_id: v.color_id ?? null,
+          name: v.name.trim() || 'Color',
+          hex: /^#[0-9a-fA-F]{6}$/.test(v.hex) ? v.hex : '#888888',
+          image: v.image || '',
+          images: v.images ?? [],
+          price: v.price !== '' && !isNaN(Number(v.price)) ? Number(v.price) : null,
+          stock_status: v.stock_status,
+          sort_order: i,
+          is_active: v.is_active ?? true,
+          updated_at: new Date().toISOString(),
+        };
+        if (v.id) vrow.id = v.id;
+        return vrow;
+      });
+      const { error: varErr } = await supabase.from('product_colors').upsert(variantRows);
+      if (varErr) {
+        setSaveError(varErr.message);
+        setSaving(false);
+        return;
+      }
+    }
+
+    // Delete removed variants
+    if (isEdit && originalVariantIds.length > 0) {
+      const keptIds = variants.filter((v) => v.id).map((v) => v.id);
+      const toDelete = originalVariantIds.filter((id) => !keptIds.includes(id));
+      if (toDelete.length > 0) {
+        await supabase.from('product_colors').delete().in('id', toDelete);
+      }
+    }
+
+    onSuccess(isEdit ? 'Product updated successfully.' : 'Product added successfully.');
     setSaving(false);
     onClose();
   };
 
+  const isAnyVariantUploading = Object.values(variantUploading).some(Boolean);
+  const isFormLocked = saving;
+  const isLocked = saving || uploading || isAnyVariantUploading;
+
   const inputClass =
     'w-full bg-[#161616] border border-white/10 text-white font-body text-sm px-3 py-4 md:py-3 ' +
     'focus:outline-none focus:border-[#ff5500] transition-colors placeholder:text-stone-700';
-
-  // Only saving locks the text fields — uploading does not.
-  const isFormLocked = saving;
-  // Image controls and the action buttons are locked during both upload and save.
-  const isLocked = saving || uploading;
 
   const removeImageAtIndex = (index) => {
     setImageUrls((prev) => prev.filter((_, i) => i !== index));
@@ -537,6 +944,90 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
                 Show in New Arrivals section
               </span>
             </label>
+          </div>
+
+          {/* Color Variants */}
+          <div className="border-t border-white/10 pt-5">
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={hasColorVariants}
+                onChange={(e) => setHasColorVariants(e.target.checked)}
+                disabled={isFormLocked}
+                className="w-4 h-4 accent-[#ff5500] mt-0.5 flex-shrink-0"
+              />
+              <div>
+                <span className="font-body text-stone-300 text-sm group-hover:text-white transition-colors select-none">
+                  Has color variants
+                </span>
+                <p className="font-technical text-[10px] text-stone-600 mt-0.5">
+                  Each variant can have its own image, stock status and price override
+                </p>
+              </div>
+            </label>
+
+            {hasColorVariants && (
+              <div className="mt-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-technical text-[10px] uppercase tracking-widest text-stone-500">
+                    Color Variants ({variants.length})
+                  </span>
+                  <button
+                    type="button"
+                    onClick={addVariant}
+                    disabled={isLocked}
+                    className="flex items-center gap-1 font-technical text-[10px] uppercase tracking-widest text-[#ff5500] hover:text-white transition-colors disabled:opacity-50"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>add</span>
+                    Add Variant
+                  </button>
+                </div>
+
+                {fieldErrors.variants && (
+                  <p className="font-technical text-[10px] text-red-400">{fieldErrors.variants}</p>
+                )}
+
+                {variants.length === 0 ? (
+                  <div className="border border-dashed border-white/10 p-6 text-center">
+                    <p className="font-technical text-[10px] uppercase tracking-widest text-stone-600">
+                      No variants yet — click Add Variant
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {variants.map((v, i) => (
+                      <VariantRow
+                        key={v.id ?? `new-${i}`}
+                        variant={v}
+                        index={i}
+                        total={variants.length}
+                        globalColors={globalColors}
+                        uploading={!!variantUploading[i]}
+                        uploadProgress={variantUploadProgress[i] ?? 0}
+                        uploadError={variantUploadError[i] ?? null}
+                        onChange={(patch) => updateVariant(i, patch)}
+                        onRemove={() => removeVariant(i)}
+                        onMoveUp={() => moveVariant(i, i - 1)}
+                        onMoveDown={() => moveVariant(i, i + 1)}
+                        onImageUpload={() => {
+                          setPendingVariantIdx(i);
+                          variantFileInputRef.current?.click();
+                        }}
+                        disabled={isLocked}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                <input
+                  ref={variantFileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handleVariantFileSelect}
+                  className="hidden"
+                />
+              </div>
+            )}
           </div>
 
           <AnimatePresence>

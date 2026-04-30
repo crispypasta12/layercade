@@ -49,13 +49,7 @@ export default function ProductModalPage() {
       if (!isMounted) return;
       setProduct(currentProduct);
       setSelectedImage(null);
-      // Default highlight to first active variant (resolveProductView handles actual resolution)
-      if (currentProduct?.has_color_variants && currentProduct?.colorVariants?.length) {
-        const firstActive = currentProduct.colorVariants.filter((v) => v.is_active)[0];
-        setSelectedColor(firstActive?.id ?? null);
-      } else {
-        setSelectedColor(null);
-      }
+      setSelectedColor(null);
 
       if (currentProduct) {
         getRelatedProducts(currentProduct.category, slug).then((related) => {

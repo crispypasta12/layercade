@@ -67,8 +67,8 @@ function toProduct(row) {
 
 // ─── Variant resolver ────────────────────────────────────────────────────────
 /**
- * Returns a product view with image/price/stock resolved to the given color
- * variant (or the first active variant when colorId is null).
+ * Returns a product view with image/price/stock resolved to the given color variant.
+ * When colorId is null, returns the base product unchanged (base images shown).
  * Returns the product unchanged when it has no active variants.
  */
 export function resolveProductView(product, colorId = null) {
@@ -77,8 +77,12 @@ export function resolveProductView(product, colorId = null) {
   const active = product.colorVariants.filter((v) => v.is_active);
   if (!active.length) return product;
 
-  const variant = (colorId ? active.find((v) => v.id === colorId) : null) ?? active[0];
-  if (!variant) return product;
+  // No explicit color selected — show base product images unchanged.
+  if (!colorId) return { ...product, activeVariant: null };
+
+  const variant = active.find((v) => v.id === colorId);
+  // Unknown variant id — fall back to base images.
+  if (!variant) return { ...product, activeVariant: null };
 
   const variantImages = parseProductImages(variant.image, variant.images);
   const primaryImage   = variantImages[0] ?? product.images[0] ?? null;

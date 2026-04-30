@@ -25,7 +25,13 @@ export default function ProductCard({ product, location }) {
   const handleAddToCart = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    addItem(product);
+    const color = product.has_color_variants && product.colorVariants?.length
+      ? (() => {
+          const v = product.colorVariants.find((c) => c.is_active) ?? null;
+          return v ? { id: v.id, name: v.name, hex: v.hex } : null;
+        })()
+      : null;
+    addItem(product, 1, color);
     openCart();
   };
 
@@ -92,6 +98,28 @@ export default function ProductCard({ product, location }) {
         <div className="space-y-1">
           <span className="font-technical text-[10px] text-[#ff5500] uppercase">{product.category}</span>
           <h4 className="text-white font-medium text-lg leading-tight truncate">{product.name}</h4>
+
+          {/* Color swatches */}
+          {product.has_color_variants && product.colorVariants?.length > 0 && (() => {
+            const active = product.colorVariants.filter((v) => v.is_active);
+            const shown  = active.slice(0, 6);
+            const extra  = active.length - shown.length;
+            return (
+              <div className="flex items-center gap-1 mt-1">
+                {shown.map((v) => (
+                  <span
+                    key={v.id}
+                    className="w-3 h-3 flex-shrink-0 border border-white/20"
+                    style={{ background: v.hex }}
+                    title={v.name}
+                  />
+                ))}
+                {extra > 0 && (
+                  <span className="font-technical text-[9px] text-stone-600">+{extra}</span>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Stars */}
           <div className="flex items-center gap-0.5 text-orange-500 text-xs">

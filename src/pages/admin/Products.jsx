@@ -15,6 +15,12 @@ const STOCK_OPTIONS = [
   { value: 'low_stock',    label: 'Low Stock' },
 ];
 
+const VARIANTS_OPTIONS = [
+  { value: 'all',          label: 'All Products' },
+  { value: 'has_variants', label: 'Has Color Variants' },
+  { value: 'no_variants',  label: 'No Color Variants' },
+];
+
 const STOCK_COLORS = {
   in_stock:     { bg: 'bg-green-500/20',  text: 'text-green-400',  label: 'In Stock' },
   out_of_stock: { bg: 'bg-red-500/20',    text: 'text-red-400',    label: 'Out of Stock' },
@@ -37,6 +43,29 @@ function CategoryBadge({ category }) {
     <span className="inline-block px-2 py-0.5 text-[10px] font-technical uppercase tracking-widest bg-blue-500/20 text-blue-400">
       {category}
     </span>
+  );
+}
+
+function SwatchStrip({ colors }) {
+  if (!colors || colors.length === 0) return null;
+  const active = [...colors].filter((c) => c.is_active).sort((a, b) => a.sort_order - b.sort_order);
+  if (active.length === 0) return null;
+  const visible = active.slice(0, 6);
+  const overflow = active.length - visible.length;
+  return (
+    <div className="flex items-center gap-1">
+      {visible.map((c) => (
+        <span
+          key={c.id}
+          title={c.name}
+          className="w-4 h-4 border border-white/20 flex-shrink-0"
+          style={{ background: c.hex }}
+        />
+      ))}
+      {overflow > 0 && (
+        <span className="font-technical text-[9px] text-stone-500 ml-0.5">+{overflow}</span>
+      )}
+    </div>
   );
 }
 
@@ -65,12 +94,16 @@ export default function AdminProducts() {
   const [error,      setError]      = useState(null);
 
   // Filters
-  const [categoryFilter, setCategoryFilter] = useState('All Categories');
-  const [stockFilter,    setStockFilter]    = useState('all');
-  const [searchInput,    setSearchInput]    = useState('');
-  const [search,         setSearch]         = useState('');
-  const [isSearching,    setIsSearching]    = useState(false);
+  const [categoryFilter,  setCategoryFilter]  = useState('All Categories');
+  const [stockFilter,     setStockFilter]     = useState('all');
+  const [variantsFilter,  setVariantsFilter]  = useState('all');
+  const [searchInput,     setSearchInput]     = useState('');
+  const [search,          setSearch]          = useState('');
+  const [isSearching,     setIsSearching]     = useState(false);
   const debounceRef = useRef(null);
+
+  // Quick-toggle saving state (product id → bool)
+  const [togglingIds, setTogglingIds] = useState({});
 
   // Modal + toast state
   const [showProductModal, setShowProductModal] = useState(false);
@@ -85,7 +118,7 @@ export default function AdminProducts() {
 
     const { data, error } = await supabase
       .from('products')
-      .select('*')
+      .select('*, product_colors(id, hex, name, sort_order, is_active)')
       .order('sort_order', { ascending: true });
 
     setLoading(false);
@@ -133,6 +166,8 @@ export default function AdminProducts() {
   const filtered = products.filter((p) => {
     if (categoryFilter !== 'All Categories' && p.category !== categoryFilter) return false;
     if (stockFilter !== 'all' && p.stock_status !== stockFilter) return false;
+    if (variantsFilter === 'has_variants' && !p.has_color_variants) return false;
+    if (variantsFilter === 'no_variants'  &&  p.has_color_variants) return false;
     if (search && !p.name.toLowerCase().includes(search) && !p.category.toLowerCase().includes(search)) return false;
     return true;
   });
@@ -180,6 +215,26 @@ export default function AdminProducts() {
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
+  };
+
+  const handleToggleVariants = async (product) => {
+    const newValue = !product.has_color_variants;
+    // Optimistic update
+    setProducts((prev) => prev.map((p) => p.id === product.id ? { ...p, has_color_variants: newValue } : p));
+    setTogglingIds((prev) => ({ ...prev, [product.id]: true }));
+
+    const { error } = await supabase
+      .from('products')
+      .update({ has_color_variants: newValue })
+      .eq('id', product.id);
+
+    setTogglingIds((prev) => ({ ...prev, [product.id]: false }));
+
+    if (error) {
+      // Revert on failure
+      setProducts((prev) => prev.map((p) => p.id === product.id ? { ...p, has_color_variants: !newValue } : p));
+      showToast('Failed to update variant setting: ' + error.message, 'error');
+    }
   };
 
   const handleModalClose = () => {
@@ -277,6 +332,26 @@ export default function AdminProducts() {
             </span>
           </div>
 
+          {/* Color variants */}
+          <div className="relative">
+            <select
+              value={variantsFilter}
+              onChange={(e) => setVariantsFilter(e.target.value)}
+              className={selectClass + ' w-full sm:w-auto'}
+              style={{ paddingRight: '2rem' }}
+            >
+              {VARIANTS_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value} className="bg-[#161616]">{o.label}</option>
+              ))}
+            </select>
+            <span
+              className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-stone-500"
+              style={{ fontSize: 16 }}
+            >
+              expand_more
+            </span>
+          </div>
+
           {/* Search */}
           <div className="relative flex-1 min-w-0 sm:min-w-[200px] sm:max-w-sm">
             <span
@@ -352,7 +427,7 @@ export default function AdminProducts() {
               <>
                 <p className="font-headline text-4xl text-white mb-4">NO PRODUCTS FOUND</p>
                 <button
-                  onClick={() => { setCategoryFilter('All Categories'); setStockFilter('all'); setSearchInput(''); }}
+                  onClick={() => { setCategoryFilter('All Categories'); setStockFilter('all'); setVariantsFilter('all'); setSearchInput(''); }}
                   className="font-technical text-xs uppercase tracking-widest text-[#ff5500]
                              border border-[#ff5500]/40 px-6 py-2 hover:bg-[#ff5500]/10 transition-colors"
                 >
@@ -405,8 +480,8 @@ export default function AdminProducts() {
                     <StockBadge status={product.stock_status} />
                   </div>
 
-                  {/* Icons row */}
-                  <div className="flex gap-2">
+                  {/* Icons + swatches row */}
+                  <div className="flex items-center gap-2 flex-wrap">
                     {product.featured && (
                       <span
                         className="material-symbols-outlined text-yellow-500"
@@ -425,10 +500,20 @@ export default function AdminProducts() {
                         new_releases
                       </span>
                     )}
+                    {product.has_color_variants && (
+                      <SwatchStrip colors={product.product_colors} />
+                    )}
                   </div>
 
+                  {/* Color variant count */}
+                  {product.has_color_variants && Array.isArray(product.product_colors) && product.product_colors.length > 0 && (
+                    <p className="font-technical text-[9px] uppercase tracking-widest text-stone-500">
+                      {product.product_colors.filter((c) => c.is_active).length} color variant{product.product_colors.filter((c) => c.is_active).length !== 1 ? 's' : ''}
+                    </p>
+                  )}
+
                   {/* Actions */}
-                  <div className="flex gap-4 mt-auto pt-2 border-t border-white/5">
+                  <div className="flex items-center gap-3 mt-auto pt-2 border-t border-white/5 flex-wrap">
                     <button
                       onClick={() => handleEditProduct(product)}
                       className="flex items-center gap-1 font-technical text-[10px] uppercase tracking-widest
@@ -444,6 +529,22 @@ export default function AdminProducts() {
                     >
                       <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
                       Delete
+                    </button>
+                    {/* Quick color-variant toggle */}
+                    <button
+                      onClick={() => handleToggleVariants(product)}
+                      disabled={!!togglingIds[product.id]}
+                      title={product.has_color_variants ? 'Disable color variants' : 'Enable color variants'}
+                      className={`ml-auto flex items-center gap-1 font-technical text-[10px] uppercase tracking-widest transition-colors
+                        disabled:opacity-50 ${product.has_color_variants ? 'text-[#ff5500]' : 'text-stone-600 hover:text-stone-300'}`}
+                    >
+                      <span
+                        className="material-symbols-outlined"
+                        style={{ fontSize: 16, fontVariationSettings: product.has_color_variants ? "'FILL' 1" : "'FILL' 0" }}
+                      >
+                        palette
+                      </span>
+                      <span className="hidden sm:inline">{product.has_color_variants ? 'Colors On' : 'Colors Off'}</span>
                     </button>
                   </div>
                 </div>

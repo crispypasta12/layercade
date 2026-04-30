@@ -10,14 +10,15 @@ export const useCartStore = create(
       openCart: () => set({ isCartOpen: true }),
       closeCart: () => set({ isCartOpen: false }),
 
-      addItem: (product, quantity = 1) => {
+      addItem: (product, quantity = 1, color = null) => {
         const items = get().items;
-        const existing = items.find((i) => i.productId === product.id);
+        const lineKey = `${product.id}::${color?.id ?? ''}`;
+        const existing = items.find((i) => i.lineKey === lineKey);
         const nextQuantity = Math.max(1, Number(quantity) || 1);
         if (existing) {
           set({
             items: items.map((i) =>
-              i.productId === product.id
+              i.lineKey === lineKey
                 ? { ...i, quantity: i.quantity + nextQuantity }
                 : i
             ),
@@ -27,30 +28,34 @@ export const useCartStore = create(
             items: [
               ...items,
               {
+                lineKey,
                 productId: product.id,
                 name: product.name,
                 price: product.price,
                 quantity: nextQuantity,
                 image: product.images?.[0] ?? product.img1 ?? null,
                 slug: product.slug,
+                colorId:   color?.id   ?? null,
+                colorName: color?.name ?? null,
+                colorHex:  color?.hex  ?? null,
               },
             ],
           });
         }
       },
 
-      removeItem: (productId) => {
-        set({ items: get().items.filter((i) => i.productId !== productId) });
+      removeItem: (lineKey) => {
+        set({ items: get().items.filter((i) => i.lineKey !== lineKey) });
       },
 
-      updateQuantity: (productId, quantity) => {
+      updateQuantity: (lineKey, quantity) => {
         if (quantity < 1) {
-          set({ items: get().items.filter((i) => i.productId !== productId) });
+          set({ items: get().items.filter((i) => i.lineKey !== lineKey) });
           return;
         }
         set({
           items: get().items.map((i) =>
-            i.productId === productId ? { ...i, quantity } : i
+            i.lineKey === lineKey ? { ...i, quantity } : i
           ),
         });
       },

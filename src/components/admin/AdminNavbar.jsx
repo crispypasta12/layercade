@@ -31,6 +31,7 @@ const NAV_LINKS = [
   { label: 'Orders',     to: '/admin/orders',                 icon: 'receipt_long' },
   { label: 'Products',   to: '/admin/products',               icon: 'inventory_2' },
   { label: 'Categories', to: '/admin/categories',             icon: 'category' },
+  { label: 'Colors',     to: '/admin/colors',                 icon: 'palette' },
   { label: 'Calculator', to: '/admin/calculator',             icon: 'calculate' },
   { label: 'Invoices',   to: '/admin/invoices',               icon: 'receipt' },
   { label: 'Tasks',      to: '/admin/tasks',                  icon: 'task_alt' },

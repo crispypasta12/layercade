@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { getProductBySlug, getRelatedProducts } from '../data/products';
+import { getProductBySlug, getRelatedProducts, resolveProductView } from '../data/products';
 import { useCartStore } from '../store/cartStore';
 
 function formatStockStatus(status) {
@@ -33,6 +33,7 @@ export default function ProductModalPage() {
   const [product, setProduct] = useState(null);
   const [relatedProducts, setRelatedProducts] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [selectedColor, setSelectedColor] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [cartMessage, setCartMessage] = useState('');
   const [addedToCart, setAddedToCart] = useState(false);
@@ -47,7 +48,14 @@ export default function ProductModalPage() {
     getProductBySlug(slug).then((currentProduct) => {
       if (!isMounted) return;
       setProduct(currentProduct);
-      setSelectedImage(currentProduct?.images?.[0] ?? currentProduct?.img1 ?? null);
+      setSelectedImage(null);
+      // Default highlight to first active variant (resolveProductView handles actual resolution)
+      if (currentProduct?.has_color_variants && currentProduct?.colorVariants?.length) {
+        const firstActive = currentProduct.colorVariants.filter((v) => v.is_active)[0];
+        setSelectedColor(firstActive?.id ?? null);
+      } else {
+        setSelectedColor(null);
+      }
 
       if (currentProduct) {
         getRelatedProducts(currentProduct.category, slug).then((related) => {
@@ -73,10 +81,18 @@ export default function ProductModalPage() {
     return () => { document.body.style.overflow = ''; };
   }, [isOverlay]);
 
+  const resolvedProduct = useMemo(
+    () => (product ? resolveProductView(product, selectedColor) : null),
+    [product, selectedColor]
+  );
+
   // Fix #1 — don't open the cart drawer; the inline message is enough feedback
   const handleAddToCart = () => {
-    if (!product) return;
-    addItem(product, quantity);
+    if (!resolvedProduct) return;
+    const color = resolvedProduct.activeVariant
+      ? { id: resolvedProduct.activeVariant.id, name: resolvedProduct.activeVariant.name, hex: resolvedProduct.activeVariant.hex }
+      : null;
+    addItem(resolvedProduct, quantity, color);
     setCartMessage(quantity === 1 ? 'Added to cart.' : `${quantity} items added to cart.`);
     setAddedToCart(true);
   };
@@ -118,10 +134,13 @@ export default function ProductModalPage() {
     );
   }
 
-  const productImages = product.images?.length
-    ? product.images
-    : [...new Set([product.img1, product.img2].filter(Boolean))];
+  const productImages = resolvedProduct.images?.length
+    ? resolvedProduct.images
+    : [...new Set([resolvedProduct.img1, resolvedProduct.img2].filter(Boolean))];
   const activeImage = selectedImage ?? productImages[0] ?? null;
+  const activeVariants = product.has_color_variants
+    ? product.colorVariants.filter((v) => v.is_active)
+    : [];
 
   return (
     <motion.div
@@ -191,7 +210,7 @@ export default function ProductModalPage() {
                 </h1>
                 {/* Fix #2 — badges only, no redundant stat grid below */}
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <StockBadge status={product.stock_status} />
+                  <StockBadge status={resolvedProduct.stock_status} />
                   {product.featured && (
                     <span className="border border-white/10 px-3 py-1 font-technical text-[10px] uppercase tracking-[0.2em] text-stone-300">
                       Best Seller
@@ -216,7 +235,7 @@ export default function ProductModalPage() {
 
             <div className="mt-6 flex items-end gap-3">
               <p className="font-headline text-4xl text-[#ff5500]">
-                {product.price.toLocaleString('en-IN')} BDT
+                {resolvedProduct.price.toLocaleString('en-IN')} BDT
               </p>
               <p className="pb-1 font-technical text-[10px] uppercase tracking-[0.2em] text-stone-500">
                 per item
@@ -246,6 +265,36 @@ export default function ProductModalPage() {
                 </div>
               ))}
             </div>
+
+            {/* Color swatch row */}
+            {activeVariants.length > 0 && (
+              <div className="mt-8">
+                <p className="font-technical text-[10px] uppercase tracking-[0.25em] text-stone-500">
+                  Color
+                  {resolvedProduct.activeVariant && (
+                    <span className="ml-2 normal-case tracking-normal text-stone-300">
+                      — {resolvedProduct.activeVariant.name}
+                    </span>
+                  )}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {activeVariants.map((v) => (
+                    <button
+                      key={v.id}
+                      type="button"
+                      title={v.name}
+                      onClick={() => { setSelectedColor(v.id); setSelectedImage(null); }}
+                      className={`w-9 h-9 border-2 transition-colors ${
+                        selectedColor === v.id
+                          ? 'border-[#ff5500] ring-1 ring-[#ff5500]/40'
+                          : 'border-white/20 hover:border-white/50'
+                      }`}
+                      style={{ background: v.hex }}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="mt-10 flex flex-col gap-4">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-end">

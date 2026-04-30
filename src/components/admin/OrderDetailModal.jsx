@@ -368,6 +368,15 @@ export default function OrderDetailModal({ order, onClose, onUpdated, onDeleted 
                           <p className="font-body text-white text-sm leading-tight line-clamp-2">
                             {item.name ?? 'Unnamed product'}
                           </p>
+                          {item.colorHex && (
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <span
+                                className="w-3 h-3 flex-shrink-0 border border-white/20"
+                                style={{ background: item.colorHex }}
+                              />
+                              <span className="font-technical text-[10px] text-stone-500">{item.colorName}</span>
+                            </div>
+                          )}
                           <p className="font-technical text-stone-500 text-xs mt-1 uppercase tracking-widest">
                             Qty: {item.quantity ?? 1} &nbsp;·&nbsp;
                             ৳{(item.price ?? 0).toLocaleString('en-IN')} each
@@ -722,7 +731,14 @@ function OrderInvoiceTemplate({ order }) {
             const lineTotal = (item.price || 0) * (item.quantity || 1);
             return (
               <tr key={idx} style={{ background: idx % 2 === 0 ? '#ffffff' : '#f9fafb', borderBottom: '1px solid #f0f0f0' }}>
-                <td style={{ padding: '11px 14px', color: '#222' }}>{item.name || '—'}</td>
+                <td style={{ padding: '11px 14px', color: '#222' }}>
+                  {item.name || '—'}
+                  {item.colorName && (
+                    <span style={{ display: 'block', fontSize: '10px', color: '#888', marginTop: '2px' }}>
+                      {item.colorName}
+                    </span>
+                  )}
+                </td>
                 <td style={{ padding: '11px 14px', textAlign: 'center', color: '#555', fontFamily: 'monospace' }}>{item.quantity || 1}</td>
                 <td style={{ padding: '11px 14px', textAlign: 'right',  color: '#555', fontFamily: 'monospace' }}>{fmt(item.price)}</td>
                 <td style={{ padding: '11px 14px', textAlign: 'right',  color: '#222', fontFamily: 'monospace', fontWeight: 'bold' }}>{fmt(lineTotal)}</td>

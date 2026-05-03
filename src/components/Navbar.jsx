@@ -1,13 +1,13 @@
 import { Suspense, lazy, useState, useEffect, useRef } from 'react';
 import { Link, NavLink } from 'react-router-dom';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useCartStore } from '../store/cartStore';
+import { PARENT_CATEGORIES } from '../lib/categories';
 
 const SearchOverlay = lazy(() => import('./SearchOverlay'));
 const CartDrawer = lazy(() => import('./CartDrawer'));
 
 const navLinks = [
-  { label: 'Shop',         to: '/shop' },
   { label: 'Best Sellers', to: '/#best-sellers' },
   { label: 'Process',      to: '/process' },
   { label: 'Materials',    to: '/materials' },
@@ -15,13 +15,16 @@ const navLinks = [
 ];
 
 export default function Navbar() {
-  const [scrolled,       setScrolled]       = useState(false);
-  const [menuOpen,       setMenuOpen]       = useState(false);
-  const [searchOpen,     setSearchOpen]     = useState(false);
-  const [logoClicks,     setLogoClicks]     = useState(0);
-  const [adminVisible,   setAdminVisible]   = useState(false);
-  const [pendingCount,   setPendingCount]   = useState(0);
-  const logoClickTimer = useRef(null);
+  const [scrolled,         setScrolled]         = useState(false);
+  const [menuOpen,         setMenuOpen]         = useState(false);
+  const [searchOpen,       setSearchOpen]       = useState(false);
+  const [logoClicks,       setLogoClicks]       = useState(0);
+  const [adminVisible,     setAdminVisible]     = useState(false);
+  const [pendingCount,     setPendingCount]     = useState(0);
+  const [shopDropdownOpen, setShopDropdownOpen] = useState(false);
+  const [mobileShopOpen,   setMobileShopOpen]   = useState(false);
+  const shopDropdownRef = useRef(null);
+  const logoClickTimer  = useRef(null);
   const { isCartOpen, openCart, items } = useCartStore();
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
 
@@ -36,6 +39,17 @@ export default function Navbar() {
     const onResize = () => { if (window.innerWidth >= 768) setMenuOpen(false); };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // Close shop dropdown on outside click
+  useEffect(() => {
+    const onClickOutside = (e) => {
+      if (shopDropdownRef.current && !shopDropdownRef.current.contains(e.target)) {
+        setShopDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
   }, []);
 
   // Ctrl+K / Cmd+K opens search
@@ -121,6 +135,58 @@ export default function Navbar() {
 
       {/* Desktop Links */}
       <div className="hidden md:flex gap-8 items-center">
+        {/* Shop dropdown */}
+        <div ref={shopDropdownRef} className="relative">
+          <button
+            onClick={() => setShopDropdownOpen((v) => !v)}
+            className={`flex items-center gap-1 font-body font-medium tracking-wide transition-colors duration-300 ${
+              shopDropdownOpen ? 'text-[#ff5500]' : 'text-stone-400 hover:text-white'
+            }`}
+          >
+            Shop
+            <span
+              className={`material-symbols-outlined transition-transform duration-200 ${shopDropdownOpen ? 'rotate-180' : ''}`}
+              style={{ fontSize: 16 }}
+            >
+              expand_more
+            </span>
+          </button>
+
+          <AnimatePresence>
+            {shopDropdownOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 6 }}
+                transition={{ duration: 0.15 }}
+                className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-56
+                           bg-stone-950/95 backdrop-blur-md border border-white/10 shadow-xl z-50"
+              >
+                <Link
+                  to="/shop"
+                  onClick={() => setShopDropdownOpen(false)}
+                  className="block px-5 py-3 font-technical text-[10px] uppercase tracking-widest
+                             text-stone-400 hover:text-white hover:bg-white/5 transition-colors
+                             border-b border-white/5"
+                >
+                  All Products
+                </Link>
+                {PARENT_CATEGORIES.map((cat) => (
+                  <Link
+                    key={cat.slug}
+                    to={`/shop/${cat.slug}`}
+                    onClick={() => setShopDropdownOpen(false)}
+                    className="block px-5 py-3 font-technical text-[10px] uppercase tracking-widest
+                               text-stone-400 hover:text-[#ff5500] hover:bg-white/5 transition-colors"
+                  >
+                    {cat.name}
+                  </Link>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
         {navLinks.map(({ label, to }) => (
           to.startsWith('/#') ? (
             <a
@@ -233,9 +299,48 @@ export default function Navbar() {
       <div
         className={`absolute top-full left-0 w-full bg-stone-950/95 backdrop-blur-md border-b border-white/5
                     flex flex-col gap-0 md:hidden overflow-hidden transition-all duration-300 ${
-          menuOpen ? 'max-h-[400px] py-4' : 'max-h-0'
+          menuOpen ? 'max-h-[600px] py-4' : 'max-h-0'
         }`}
       >
+        {/* Shop — expandable */}
+        <button
+          onClick={() => setMobileShopOpen((v) => !v)}
+          className="flex items-center justify-between font-body font-medium tracking-wide
+                     text-stone-400 hover:text-white px-8 py-4 border-b border-white/5
+                     transition-colors duration-200 w-full"
+        >
+          Shop
+          <span
+            className={`material-symbols-outlined transition-transform duration-200 ${mobileShopOpen ? 'rotate-180' : ''}`}
+            style={{ fontSize: 16 }}
+          >
+            expand_more
+          </span>
+        </button>
+        {mobileShopOpen && (
+          <div className="flex flex-col border-b border-white/5 bg-black/20">
+            <Link
+              to="/shop"
+              onClick={() => { setMenuOpen(false); setMobileShopOpen(false); }}
+              className="font-technical text-[10px] uppercase tracking-widest text-stone-400
+                         hover:text-white px-10 py-3 border-b border-white/5 transition-colors"
+            >
+              All Products
+            </Link>
+            {PARENT_CATEGORIES.map((cat) => (
+              <Link
+                key={cat.slug}
+                to={`/shop/${cat.slug}`}
+                onClick={() => { setMenuOpen(false); setMobileShopOpen(false); }}
+                className="font-technical text-[10px] uppercase tracking-widest text-stone-400
+                           hover:text-[#ff5500] px-10 py-3 border-b border-white/5 transition-colors"
+              >
+                {cat.name}
+              </Link>
+            ))}
+          </div>
+        )}
+
         {navLinks.map(({ label, to }) => (
           to.startsWith('/#') ? (
             <a

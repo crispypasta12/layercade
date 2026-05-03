@@ -102,7 +102,8 @@ export default function LandingPage() {
           productsModule.getNewArrivals(),
           supabase
             .from('categories')
-            .select('id, name, slug, sort_order, image_url')
+            .select('id, name, slug, sort_order, image_url, parent_id')
+            .is('parent_id', null)
             .order('sort_order', { ascending: true }),
         ]);
 

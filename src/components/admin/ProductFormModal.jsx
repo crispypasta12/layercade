@@ -268,7 +268,7 @@ function VariantRow({
 export default function ProductFormModal({ product, onClose, onSuccess }) {
   const isEdit = product !== null;
   const initialImages = parseProductImages(product?.image, product?.images);
-  const { categories } = useCategories();
+  const { parentCategories, subCategories } = useCategories();
   const { colors: globalColors } = useColors();
 
   // Product fields
@@ -793,9 +793,17 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
                   disabled={isFormLocked}
                   className={inputClass + ' appearance-none cursor-pointer pr-8'}
                 >
-                  {categories.map((c) => (
-                    <option key={c.name} value={c.name} className="bg-[#161616]">{c.name}</option>
-                  ))}
+                  <option value="" className="bg-[#161616]">— Select a category —</option>
+                  {parentCategories.map((parent) => {
+                    const children = subCategories.filter((s) => s.parent_id === parent.id);
+                    return (
+                      <optgroup key={parent.id} label={parent.name}>
+                        {children.map((c) => (
+                          <option key={c.id} value={c.name} className="bg-[#161616]">{c.name}</option>
+                        ))}
+                      </optgroup>
+                    );
+                  })}
                 </select>
                 <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-stone-500" style={{ fontSize: 16 }}>expand_more</span>
               </div>

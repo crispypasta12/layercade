@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCategories } from '../lib/useCategories';
 import { fetchProductsByCategory } from '../data/products';
 import ProductCard, { fadeUp } from '../components/ProductCard';
+import { isParentSlug, subCategoryNamesForParent } from '../lib/categories';
 
 const PER_PAGE = 12;
 
@@ -229,10 +230,19 @@ export default function ShopPage() {
   const { categorySlug } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const { categories, loading: categoriesLoading } = useCategories();
+  const { allCategories, parentCategories, subCategories, loading: categoriesLoading } = useCategories();
 
-  const slugToCategory = (slug) => categories.find((c) => c.slug === slug)?.name ?? null;
-  const activeCategory = categorySlug ? slugToCategory(categorySlug) : null;
+  const activeCategory = useMemo(
+    () => categorySlug ? (allCategories.find((c) => c.slug === categorySlug)?.name ?? null) : null,
+    [categorySlug, allCategories],
+  );
+
+  // If slug is a parent, collect sub-category names to fetch all children's products
+  const activeIsParent = categorySlug ? isParentSlug(categorySlug) : false;
+  const activeSubNames = useMemo(
+    () => activeIsParent ? subCategoryNamesForParent(categorySlug) : null,
+    [activeIsParent, categorySlug],
+  );
 
   const [page, setPage]         = useState(1);
   const [products, setProducts] = useState([]);
@@ -268,7 +278,8 @@ export default function ShopPage() {
     setLoading(true);
 
     fetchProductsByCategory({
-      category: activeCategory,
+      categories: activeSubNames ?? undefined,
+      category: activeSubNames ? undefined : activeCategory,
       page,
       perPage: PER_PAGE,
       sort,
@@ -282,7 +293,7 @@ export default function ShopPage() {
     });
 
     return () => { isMounted = false; };
-  }, [activeCategory, page, categorySlug, categoriesLoading, sort, priceMin, priceMax]);
+  }, [activeCategory, activeSubNames, page, categorySlug, categoriesLoading, sort, priceMin, priceMax]);
 
   const totalPages = Math.ceil(total / PER_PAGE);
 
@@ -325,7 +336,28 @@ export default function ShopPage() {
           <Link to="/" className="hover:text-[#ff5500] transition-colors">Home</Link>
           <span>/</span>
           <Link to="/shop" className="hover:text-[#ff5500] transition-colors">Shop</Link>
-          {activeCategory && (
+          {activeCategory && !activeIsParent && (() => {
+            const sub = allCategories.find((c) => c.name === activeCategory);
+            const parent = sub ? parentCategories.find((p) => p.id === sub.parent_id) : null;
+            return (
+              <>
+                {parent && (
+                  <>
+                    <span>/</span>
+                    <button
+                      onClick={() => handleCategory(parent.slug)}
+                      className="hover:text-[#ff5500] transition-colors"
+                    >
+                      {parent.name}
+                    </button>
+                  </>
+                )}
+                <span>/</span>
+                <span className="text-white">{activeCategory}</span>
+              </>
+            );
+          })()}
+          {activeIsParent && activeCategory && (
             <>
               <span>/</span>
               <span className="text-white">{activeCategory}</span>
@@ -367,54 +399,115 @@ export default function ShopPage() {
                 All Products
               </button>
             </li>
-            {categories.map((cat) => (
-              <li key={cat.slug}>
-                <button
-                  onClick={() => handleCategory(cat.slug)}
-                  className={`w-full text-left px-4 py-2.5 font-technical text-xs uppercase tracking-wide transition-colors ${
-                    activeCategory === cat.name
-                      ? 'bg-[#ff5500] text-white'
-                      : 'text-stone-400 hover:text-white hover:bg-white/5'
-                  }`}
-                >
-                  {cat.name}
-                </button>
-              </li>
-            ))}
+            {parentCategories.map((parent) => {
+              const children = subCategories.filter((s) => s.parent_id === parent.id);
+              const parentActive = categorySlug === parent.slug;
+              const childActive  = children.some((c) => activeCategory === c.name);
+              return (
+                <li key={parent.slug}>
+                  <button
+                    onClick={() => handleCategory(parent.slug)}
+                    className={`w-full text-left px-4 py-2.5 font-technical text-xs uppercase tracking-wide transition-colors ${
+                      parentActive
+                        ? 'bg-[#ff5500] text-white'
+                        : 'text-stone-300 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    {parent.name}
+                  </button>
+                  {(parentActive || childActive) && children.length > 0 && (
+                    <ul className="ml-3 border-l border-white/10">
+                      {children.map((sub) => (
+                        <li key={sub.slug}>
+                          <button
+                            onClick={() => handleCategory(sub.slug)}
+                            className={`w-full text-left pl-3 pr-4 py-2 font-technical text-[10px] uppercase tracking-wide transition-colors ${
+                              activeCategory === sub.name
+                                ? 'text-[#ff5500]'
+                                : 'text-stone-500 hover:text-white'
+                            }`}
+                          >
+                            {sub.name}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </aside>
 
         {/* ── Main content ─────────────────────────────────────── */}
         <div className="flex-1 min-w-0">
-          {/* Mobile category tabs */}
-          <div className="lg:hidden mb-8 -mx-4 px-4 overflow-x-auto scrollbar-hide">
-            <div className="flex gap-2 pb-2 min-w-max">
-              <button
-                ref={!activeCategory ? activeTabRef : null}
-                onClick={() => handleCategory(null)}
-                className={`flex-shrink-0 px-5 py-2 font-technical text-[10px] uppercase tracking-wider clip-parallelogram transition-all ${
-                  !activeCategory
-                    ? 'bg-[#ff5500] text-white'
-                    : 'border border-stone-700 text-stone-400 hover:border-[#ff5500] hover:text-white'
-                }`}
-              >
-                All
-              </button>
-              {categories.map((cat) => (
+          {/* Mobile category tabs — parent row, then sub-row when a parent is active */}
+          <div className="lg:hidden mb-8 -mx-4 px-4">
+            <div className="overflow-x-auto scrollbar-hide">
+              <div className="flex gap-2 pb-2 min-w-max">
                 <button
-                  key={cat.slug}
-                  ref={activeCategory === cat.name ? activeTabRef : null}
-                  onClick={() => handleCategory(cat.slug)}
+                  ref={!activeCategory ? activeTabRef : null}
+                  onClick={() => handleCategory(null)}
                   className={`flex-shrink-0 px-5 py-2 font-technical text-[10px] uppercase tracking-wider clip-parallelogram transition-all ${
-                    activeCategory === cat.name
+                    !activeCategory
                       ? 'bg-[#ff5500] text-white'
                       : 'border border-stone-700 text-stone-400 hover:border-[#ff5500] hover:text-white'
                   }`}
                 >
-                  {cat.name}
+                  All
                 </button>
-              ))}
+                {parentCategories.map((parent) => {
+                  const parentActive = categorySlug === parent.slug;
+                  const childActive  = subCategories
+                    .filter((s) => s.parent_id === parent.id)
+                    .some((c) => activeCategory === c.name);
+                  return (
+                    <button
+                      key={parent.slug}
+                      ref={(parentActive || childActive) ? activeTabRef : null}
+                      onClick={() => handleCategory(parent.slug)}
+                      className={`flex-shrink-0 px-5 py-2 font-technical text-[10px] uppercase tracking-wider clip-parallelogram transition-all ${
+                        (parentActive || childActive)
+                          ? 'bg-[#ff5500] text-white'
+                          : 'border border-stone-700 text-stone-400 hover:border-[#ff5500] hover:text-white'
+                      }`}
+                    >
+                      {parent.name}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+            {/* Sub-category row — shown when a parent or one of its children is active */}
+            {categorySlug && (() => {
+              const activeParent = parentCategories.find((p) => p.slug === categorySlug)
+                ?? parentCategories.find((p) =>
+                    subCategories.filter((s) => s.parent_id === p.id).some((s) => activeCategory === s.name)
+                  );
+              if (!activeParent) return null;
+              const children = subCategories.filter((s) => s.parent_id === activeParent.id);
+              if (!children.length) return null;
+              return (
+                <div className="overflow-x-auto scrollbar-hide mt-1">
+                  <div className="flex gap-2 pb-2 min-w-max">
+                    {children.map((sub) => (
+                      <button
+                        key={sub.slug}
+                        ref={activeCategory === sub.name ? activeTabRef : null}
+                        onClick={() => handleCategory(sub.slug)}
+                        className={`flex-shrink-0 px-4 py-1.5 font-technical text-[9px] uppercase tracking-wider transition-all ${
+                          activeCategory === sub.name
+                            ? 'bg-[#ff5500]/20 border border-[#ff5500] text-[#ff5500]'
+                            : 'border border-stone-800 text-stone-500 hover:border-stone-600 hover:text-stone-300'
+                        }`}
+                      >
+                        {sub.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Filter bar */}

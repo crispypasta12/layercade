@@ -178,12 +178,13 @@ export async function getRelatedProducts(category, excludeSlug) {
  * sort values: 'featured' | 'price_asc' | 'price_desc' | 'newest' | 'name_asc' | 'name_desc'
  */
 export async function fetchProductsByCategory({
-  category = null,
-  page     = 1,
-  perPage  = 12,
-  sort     = 'featured',
-  priceMin = null,
-  priceMax = null,
+  category   = null,
+  categories = null,
+  page       = 1,
+  perPage    = 12,
+  sort       = 'featured',
+  priceMin   = null,
+  priceMax   = null,
 } = {}) {
   const from = (page - 1) * perPage;
   const to   = from + perPage - 1;
@@ -193,7 +194,11 @@ export async function fetchProductsByCategory({
     .select(`*, product_colors(${SWATCH_COLORS_COLUMNS})`, { count: 'exact' })
     .range(from, to);
 
-  if (category)        query = query.eq('category', category);
+  if (categories && categories.length > 0) {
+    query = query.in('category', categories);
+  } else if (category) {
+    query = query.eq('category', category);
+  }
   if (priceMin !== null) query = query.gte('price', priceMin);
   if (priceMax !== null) query = query.lte('price', priceMax);
 

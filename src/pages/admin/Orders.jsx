@@ -86,10 +86,18 @@ export default function AdminOrders() {
   const [searchInput,  setSearchInput]  = useState('');
 
   // Pagination
-  const [page, setPage] = useState(0);
+  const [page,       setPage]       = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+
+  // Stat cards (always unfiltered totals)
+  const [stats, setStats] = useState({ total: 0, pending: 0, completed: 0, revenue: 0 });
 
   // IDs of orders currently being advanced (for inline spinner)
   const [advancingIds, setAdvancingIds] = useState(new Set());
+
+  // Bump to force a refetch without changing other deps
+  const [refreshKey, setRefreshKey] = useState(0);
+  const refresh = useCallback(() => setRefreshKey(k => k + 1), []);
 
   /* ── Debounce search input ─────────────────────────────────── */
   useEffect(() => {
@@ -100,51 +108,59 @@ export default function AdminOrders() {
     return () => clearTimeout(id);
   }, [searchInput]);
 
-  /* ── Fetch orders ──────────────────────────────────────────── */
+  /* ── Fetch orders (server-side filtered + paginated) ────────── */
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     setError(null);
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('orders')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+    if (statusFilter !== 'all') query = query.eq('status', statusFilter);
+
+    if (search) {
+      const cleaned = search.replace(/^ord-/i, '');
+      const parts   = [`customer_name.ilike.%${cleaned}%`, `phone.ilike.%${cleaned}%`];
+      const idNum   = parseInt(cleaned, 10);
+      if (!isNaN(idNum)) parts.push(`id.eq.${idNum}`);
+      query = query.or(parts.join(','));
+    }
+
+    const [tableRes, statsRes] = await Promise.all([
+      query,
+      supabase.from('orders').select('status, total_amount'),
+    ]);
 
     setLoading(false);
 
-    if (error) {
-      setError('Failed to load orders. ' + error.message);
+    if (tableRes.error) {
+      setError('Failed to load orders. ' + tableRes.error.message);
       return;
     }
 
-    setOrders(data ?? []);
-  }, []);
+    setOrders(tableRes.data ?? []);
+    setTotalCount(tableRes.count ?? 0);
+
+    if (statsRes.data) {
+      const d = statsRes.data;
+      setStats({
+        total:     d.length,
+        pending:   d.filter(o => o.status === 'pending').length,
+        completed: d.filter(o => o.status === 'delivered').length,
+        revenue:   d
+          .filter(o => o.status !== 'cancelled' && o.status !== 'returned')
+          .reduce((s, o) => s + (o.total_amount ?? 0), 0),
+      });
+    }
+  }, [page, statusFilter, search, refreshKey]);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
-  /* ── Filtering ─────────────────────────────────────────────── */
-  const filtered = orders.filter((o) => {
-    if (statusFilter !== 'all' && o.status !== statusFilter) return false;
-    if (search) {
-      const id   = String(o.id).toLowerCase();
-      const name = (o.customer_name ?? '').toLowerCase();
-      const ph   = (o.phone ?? '').toLowerCase();
-      if (!id.includes(search) && !name.includes(search) && !ph.includes(search)) return false;
-    }
-    return true;
-  });
-
-  /* ── Stats ─────────────────────────────────────────────────── */
-  const totalOrders    = orders.length;
-  const pendingOrders  = orders.filter((o) => o.status === 'pending').length;
-  const completedOrders = orders.filter((o) => o.status === 'delivered').length;
-  const totalRevenue   = orders
-    .filter((o) => o.status !== 'cancelled' && o.status !== 'returned')
-    .reduce((sum, o) => sum + (o.total_amount ?? 0), 0);
-
   /* ── Pagination ─────────────────────────────────────────────── */
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paginated  = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
   const handleStatusChange = (val) => {
     setStatusFilter(val);
@@ -178,10 +194,28 @@ export default function AdminOrders() {
     }
   };
 
-  /* ── CSV Export ─────────────────────────────────────────────── */
-  const exportCSV = () => {
+  /* ── CSV Export (fetches all filtered rows, no page limit) ───── */
+  const exportCSV = async () => {
+    let query = supabase
+      .from('orders')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (statusFilter !== 'all') query = query.eq('status', statusFilter);
+
+    if (search) {
+      const cleaned = search.replace(/^ord-/i, '');
+      const parts   = [`customer_name.ilike.%${cleaned}%`, `phone.ilike.%${cleaned}%`];
+      const idNum   = parseInt(cleaned, 10);
+      if (!isNaN(idNum)) parts.push(`id.eq.${idNum}`);
+      query = query.or(parts.join(','));
+    }
+
+    const { data } = await query;
+    if (!data || data.length === 0) return;
+
     const headers = ['Order ID', 'Date', 'Customer', 'Phone', 'Fulfillment', 'District', 'Items', 'Total (৳)', 'Status'];
-    const rows = filtered.map((o) => [
+    const rows = data.map((o) => [
       `ORD-${o.id}`,
       formatDate(o.created_at),
       o.customer_name ?? '',
@@ -222,16 +256,16 @@ export default function AdminOrders() {
             Orders
           </h1>
           <p className="font-technical text-xs text-stone-500 uppercase tracking-widest mt-1">
-            {loading ? 'Loading…' : `${totalOrders} total orders`}
+            {loading ? 'Loading…' : `${stats.total} total orders`}
           </p>
         </div>
 
         {/* ── Stats cards ─────────────────────────────────────────── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-          <StatCard label="Total Orders"     value={totalOrders}                                              />
-          <StatCard label="Pending"          value={pendingOrders}   accent                                   />
-          <StatCard label="Delivered"        value={completedOrders}                                          />
-          <StatCard label="Total Revenue"    value={`৳${totalRevenue.toLocaleString('en-IN')}`} accent        />
+          <StatCard label="Total Orders"     value={stats.total}                                              />
+          <StatCard label="Pending"          value={stats.pending}    accent                                  />
+          <StatCard label="Delivered"        value={stats.completed}                                          />
+          <StatCard label="Total Revenue"    value={`৳${stats.revenue.toLocaleString('en-IN')}`} accent       />
         </div>
 
         {/* ── Filters + Export ────────────────────────────────────── */}
@@ -260,7 +294,7 @@ export default function AdminOrders() {
             {/* Export CSV (shown inline on mobile) */}
             <button
               onClick={exportCSV}
-              disabled={filtered.length === 0}
+              disabled={totalCount === 0}
               className="sm:hidden flex items-center gap-2 bg-[#161616] border border-white/10 px-3 py-2
                          font-technical text-xs uppercase tracking-widest text-stone-300
                          hover:border-[#ff5500] hover:text-[#ff5500] transition-colors
@@ -300,7 +334,7 @@ export default function AdminOrders() {
           <div className="hidden sm:flex sm:items-center sm:gap-2 sm:ml-auto">
             <button
               onClick={exportCSV}
-              disabled={filtered.length === 0}
+              disabled={totalCount === 0}
               className="flex items-center gap-2 bg-[#161616] border border-white/10 px-4 py-2
                          font-technical text-xs uppercase tracking-widest text-stone-300
                          hover:border-[#ff5500] hover:text-[#ff5500] transition-colors
@@ -349,7 +383,7 @@ export default function AdminOrders() {
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
             </svg>
           </div>
-        ) : paginated.length === 0 ? (
+        ) : orders.length === 0 ? (
           <div className="text-center font-body text-stone-600 py-16 bg-[#111111] border border-white/5">
             No orders found.
           </div>
@@ -357,7 +391,7 @@ export default function AdminOrders() {
           <>
             {/* Mobile cards (hidden on md+) */}
             <div className="md:hidden space-y-3">
-              {paginated.map((order, idx) => {
+              {orders.map((order, idx) => {
                 const itemCount = Array.isArray(order.items)
                   ? order.items.reduce((s, i) => s + (i.quantity ?? 1), 0)
                   : 0;
@@ -482,7 +516,7 @@ export default function AdminOrders() {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginated.map((order, idx) => {
+                  {orders.map((order, idx) => {
                     const itemCount = Array.isArray(order.items)
                       ? order.items.reduce((s, i) => s + (i.quantity ?? 1), 0)
                       : 0;
@@ -583,7 +617,7 @@ export default function AdminOrders() {
         {!loading && totalPages > 1 && (
           <div className="flex items-center justify-between border-t border-white/10 pt-4">
             <p className="font-technical text-xs text-stone-500 uppercase tracking-widest">
-              Page {page + 1} of {totalPages} &nbsp;·&nbsp; {filtered.length} results
+              Page {page + 1} of {totalPages} &nbsp;·&nbsp; {totalCount} results
             </p>
             <div className="flex gap-2">
               <button
@@ -623,8 +657,8 @@ export default function AdminOrders() {
             setSelectedOrder(updated);
           }}
           onDeleted={(deletedId) => {
-            setOrders((prev) => prev.filter((o) => o.id !== deletedId));
             setSelectedOrder(null);
+            refresh();
           }}
         />
       )}
@@ -634,8 +668,9 @@ export default function AdminOrders() {
         <CreateOrderModal
           onClose={() => setShowCreateOrder(false)}
           onCreated={(newOrder) => {
-            setOrders((prev) => [newOrder, ...prev]);
             setShowCreateOrder(false);
+            setPage(0);
+            refresh();
             setSelectedOrder(newOrder);
           }}
         />

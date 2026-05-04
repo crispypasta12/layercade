@@ -22,6 +22,15 @@ const PRIORITIES = [
 
 const DEFAULT_LABELS = ['Frontend', 'Backend', 'Print Job', 'Design', 'Marketing', 'Bug', 'Feature', 'Urgent'];
 
+const AUTO_ARCHIVE_DAYS = 3;
+
+function isDoneAutoArchived(task) {
+  if (task.status !== 'done' || !task.updated_at) return false;
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - AUTO_ARCHIVE_DAYS);
+  return new Date(task.updated_at) < cutoff;
+}
+
 // ─── Hooks ────────────────────────────────────────────────────
 
 function useIsMobile() {
@@ -97,7 +106,7 @@ function DueDateChip({ date }) {
 
 // ─── Task Card ────────────────────────────────────────────────
 
-function TaskCard({ task, members, onClick, onDragStart }) {
+function TaskCard({ task, members, onClick, onDragStart, isDragTarget, onCardDragOver, onCardDrop }) {
   const assignees = members.filter(m => (task.assignee_ids || []).includes(m.id));
   const labels = task.labels || [];
 
@@ -105,10 +114,13 @@ function TaskCard({ task, members, onClick, onDragStart }) {
     <div
       draggable
       onDragStart={e => onDragStart(e, task.id)}
+      onDragOver={e => { e.preventDefault(); e.stopPropagation(); onCardDragOver?.(task.id); }}
+      onDrop={e => { e.preventDefault(); e.stopPropagation(); onCardDrop?.(e, task.id); }}
       onClick={() => onClick(task)}
       style={{
         background: '#161616',
-        border: '1px solid rgba(255,255,255,0.06)',
+        border: isDragTarget ? '1px solid rgba(255,85,0,0.4)' : '1px solid rgba(255,255,255,0.06)',
+        borderTop: isDragTarget ? '2px solid #ff5500' : undefined,
         padding: '12px',
         cursor: 'grab',
         transition: 'border-color 0.15s, box-shadow 0.15s',
@@ -118,7 +130,7 @@ function TaskCard({ task, members, onClick, onDragStart }) {
         e.currentTarget.style.boxShadow = '0 0 16px rgba(255,85,0,0.08)';
       }}
       onMouseLeave={e => {
-        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
+        e.currentTarget.style.borderColor = isDragTarget ? 'rgba(255,85,0,0.4)' : 'rgba(255,255,255,0.06)';
         e.currentTarget.style.boxShadow = 'none';
       }}
     >
@@ -175,15 +187,27 @@ function TaskCard({ task, members, onClick, onDragStart }) {
 
 // ─── Task Column ──────────────────────────────────────────────
 
-function TaskColumn({ column, tasks, members, onCardClick, onDragStart, onDrop, onAddTask, fullWidth }) {
+function TaskColumn({ column, tasks, members, onCardClick, onDragStart, onDrop, onAddTask, fullWidth, hiddenCount = 0, onShowHidden }) {
   const [dragOver, setDragOver] = useState(false);
+  const [dragOverCardId, setDragOverCardId] = useState(null);
 
   return (
     <div
       style={{ width: fullWidth ? '100%' : 275, flexShrink: 0, display: 'flex', flexDirection: 'column' }}
-      onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-      onDragLeave={() => setDragOver(false)}
-      onDrop={e => { e.preventDefault(); setDragOver(false); onDrop(e, column.id); }}
+      onDragOver={e => { e.preventDefault(); setDragOver(true); setDragOverCardId(null); }}
+      onDragLeave={e => {
+        if (!e.currentTarget.contains(e.relatedTarget)) {
+          setDragOver(false);
+          setDragOverCardId(null);
+        }
+      }}
+      onDrop={e => {
+        e.preventDefault();
+        setDragOver(false);
+        const target = dragOverCardId;
+        setDragOverCardId(null);
+        onDrop(e, column.id, target);
+      }}
     >
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -217,7 +241,20 @@ function TaskColumn({ column, tasks, members, onCardClick, onDragStart, onDrop, 
       {/* Cards */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {tasks.map(task => (
-          <TaskCard key={task.id} task={task} members={members} onClick={onCardClick} onDragStart={onDragStart} />
+          <TaskCard
+            key={task.id}
+            task={task}
+            members={members}
+            onClick={onCardClick}
+            onDragStart={onDragStart}
+            isDragTarget={dragOverCardId === task.id}
+            onCardDragOver={cardId => { setDragOver(false); setDragOverCardId(cardId); }}
+            onCardDrop={(e, cardId) => {
+              setDragOver(false);
+              setDragOverCardId(null);
+              onDrop(e, column.id, cardId);
+            }}
+          />
         ))}
         {tasks.length === 0 && (
           <div style={{
@@ -231,6 +268,24 @@ function TaskColumn({ column, tasks, members, onCardClick, onDragStart, onDrop, 
           </div>
         )}
       </div>
+
+      {hiddenCount > 0 && (
+        <button
+          onClick={onShowHidden}
+          style={{
+            marginTop: 10, width: '100%', background: 'none',
+            border: '1px dashed rgba(255,255,255,0.07)',
+            color: '#444', cursor: 'pointer', padding: '8px 12px',
+            fontFamily: "'Space Mono', monospace", fontSize: 9,
+            textTransform: 'uppercase', letterSpacing: '0.1em',
+            transition: 'color 0.15s, border-color 0.15s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.color = '#22c55e'; e.currentTarget.style.borderColor = 'rgba(34,197,94,0.3)'; }}
+          onMouseLeave={e => { e.currentTarget.style.color = '#444'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; }}
+        >
+          + {hiddenCount} older task{hiddenCount !== 1 ? 's' : ''} — show all
+        </button>
+      )}
     </div>
   );
 }
@@ -338,20 +393,52 @@ function RoleManagerModal({ roles, onClose, onSave, onDelete }) {
 
 // ─── Member Card (sidebar) ────────────────────────────────────
 
-function MemberCard({ member, allRoles, memberRoles, onRoleToggle }) {
+const WORKLOAD_SEGMENTS = [
+  { status: 'backlog',     color: '#2a2a2a' },
+  { status: 'todo',        color: '#3b82f6' },
+  { status: 'in_progress', color: '#ff5500' },
+  { status: 'review',      color: '#a855f7' },
+  { status: 'done',        color: '#22c55e' },
+];
+
+function MemberCard({ member, allRoles, memberRoles, onRoleToggle, tasks = [] }) {
   const [expanded, setExpanded] = useState(false);
+
   const mRoles = memberRoles
     .filter(mr => mr.member_id === member.id)
     .map(mr => allRoles.find(r => r.id === mr.role_id))
     .filter(Boolean);
 
+  const mine = tasks.filter(t => (t.assignee_ids || []).includes(member.id));
+  const total      = mine.length;
+  const done       = mine.filter(t => t.status === 'done').length;
+  const inProgress = mine.filter(t => t.status === 'in_progress').length;
+  const inReview   = mine.filter(t => t.status === 'review').length;
+  const todo       = mine.filter(t => t.status === 'todo').length;
+  const backlog    = mine.filter(t => t.status === 'backlog').length;
+  const active     = total - done;
+  const overdue    = mine.filter(t => {
+    if (!t.due_date || t.status === 'done') return false;
+    const [y, m, d] = t.due_date.split('-').map(Number);
+    return new Date(y, m - 1, d) < new Date(new Date().setHours(0, 0, 0, 0));
+  }).length;
+
+  const statChip = (label, value, color) => value > 0 && (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+      <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, fontWeight: 700, color }}>{value}</span>
+      <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: '#3a3a3a', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
+    </div>
+  );
+
   return (
     <div style={{ border: '1px solid rgba(255,255,255,0.05)', background: '#111' }}>
+
+      {/* Header row */}
       <div
         style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
         onClick={() => setExpanded(v => !v)}
       >
-        <Avatar member={member} size={32} />
+        <Avatar member={member} size={34} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ margin: 0, color: '#e5e2e1', fontSize: 12, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {member.name}
@@ -368,7 +455,7 @@ function MemberCard({ member, allRoles, memberRoles, onRoleToggle }) {
                     {r.label}
                   </span>
                 ))
-              : <span style={{ fontSize: 9, color: '#333', fontFamily: "'Space Mono', monospace" }}>No roles</span>
+              : <span style={{ fontSize: 9, color: '#2a2a2a', fontFamily: "'Space Mono', monospace" }}>No roles</span>
             }
           </div>
         </div>
@@ -377,35 +464,100 @@ function MemberCard({ member, allRoles, memberRoles, onRoleToggle }) {
         </span>
       </div>
 
-      {expanded && (
-        <div style={{ padding: '0 12px 12px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-          <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: '#444', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '10px 0 8px' }}>
-            Assign Roles
-          </p>
-          {allRoles.length === 0 ? (
-            <span style={{ fontSize: 11, color: '#333', fontFamily: "'DM Sans', sans-serif" }}>No roles available — create some first.</span>
-          ) : (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {allRoles.map(role => {
-                const assigned = memberRoles.some(mr => mr.member_id === member.id && mr.role_id === role.id);
-                return (
-                  <button
-                    key={role.id}
-                    onClick={() => onRoleToggle(member.id, role.id, assigned)}
-                    style={{
-                      background: assigned ? `${member.color}20` : '#0a0a0a',
-                      border: `1px solid ${assigned ? member.color + '55' : 'rgba(255,255,255,0.08)'}`,
-                      color: assigned ? member.color : '#555',
-                      fontSize: 10, padding: '4px 8px', cursor: 'pointer',
-                      fontFamily: "'Space Mono', monospace", transition: 'all 0.15s',
-                    }}
-                  >
-                    {assigned && '✓ '}{role.label}
-                  </button>
-                );
+      {/* Workload bar + stat chips — always visible */}
+      <div style={{ padding: '0 12px 10px' }}>
+        {total > 0 ? (
+          <>
+            {/* Segmented bar */}
+            <div style={{ display: 'flex', height: 3, gap: 1, borderRadius: 2, overflow: 'hidden', marginBottom: 8 }}>
+              {WORKLOAD_SEGMENTS.map(seg => {
+                const count = mine.filter(t => t.status === seg.status).length;
+                return count > 0
+                  ? <div key={seg.status} style={{ flex: count, background: seg.color, borderRadius: 1 }} />
+                  : null;
               })}
             </div>
+
+            {/* Stat chips */}
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+              {statChip('total', total, '#555')}
+              {statChip('active', active, '#e5e2e1')}
+              {statChip('done', done, '#22c55e')}
+              {overdue > 0 && statChip('overdue', overdue, '#ef4444')}
+            </div>
+          </>
+        ) : (
+          <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: '#2a2a2a', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            No tasks assigned
+          </span>
+        )}
+      </div>
+
+      {/* Expanded section */}
+      {expanded && (
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+
+          {/* Per-status breakdown */}
+          {total > 0 && (
+            <div style={{ padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: '#444', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 6px' }}>Breakdown</p>
+              {WORKLOAD_SEGMENTS.map(seg => {
+                const count = mine.filter(t => t.status === seg.status).length;
+                if (count === 0) return null;
+                const label = seg.status === 'in_progress' ? 'In Progress' : seg.status.charAt(0).toUpperCase() + seg.status.slice(1);
+                const pct = Math.round((count / total) * 100);
+                return (
+                  <div key={seg.status} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: 1, background: seg.color, flexShrink: 0 }} />
+                    <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: '#666', flex: 1 }}>{label}</span>
+                    <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: '#555' }}>{count}</span>
+                    <div style={{ width: 40, height: 2, background: '#1a1a1a', borderRadius: 1, overflow: 'hidden' }}>
+                      <div style={{ width: `${pct}%`, height: '100%', background: seg.color, borderRadius: 1 }} />
+                    </div>
+                  </div>
+                );
+              })}
+              {overdue > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: 1, background: '#ef4444', flexShrink: 0 }} />
+                  <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: '#ef444490', flex: 1 }}>Overdue</span>
+                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: '#ef4444' }}>{overdue}</span>
+                  <div style={{ width: 40 }} />
+                </div>
+              )}
+            </div>
           )}
+
+          {/* Role assignment */}
+          <div style={{ padding: '10px 12px 12px' }}>
+            <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: '#444', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 8px' }}>
+              Roles
+            </p>
+            {allRoles.length === 0 ? (
+              <span style={{ fontSize: 11, color: '#333', fontFamily: "'DM Sans', sans-serif" }}>No roles yet — create some first.</span>
+            ) : (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {allRoles.map(role => {
+                  const assigned = memberRoles.some(mr => mr.member_id === member.id && mr.role_id === role.id);
+                  return (
+                    <button
+                      key={role.id}
+                      onClick={() => onRoleToggle(member.id, role.id, assigned)}
+                      style={{
+                        background: assigned ? `${member.color}20` : '#0a0a0a',
+                        border: `1px solid ${assigned ? member.color + '55' : 'rgba(255,255,255,0.08)'}`,
+                        color: assigned ? member.color : '#555',
+                        fontSize: 10, padding: '4px 8px', cursor: 'pointer',
+                        fontFamily: "'Space Mono', monospace", transition: 'all 0.15s',
+                      }}
+                    >
+                      {assigned && '✓ '}{role.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -414,33 +566,86 @@ function MemberCard({ member, allRoles, memberRoles, onRoleToggle }) {
 
 // ─── Team Sidebar ──────────────────────────────────────────────
 
-function TeamSidebar({ members, roles, memberRoles, onRoleToggle, onOpenRoleManager }) {
+function TeamSidebar({ members, roles, memberRoles, onRoleToggle, onOpenRoleManager, collapsed = false, onToggle, tasks = [] }) {
   return (
     <div style={{
-      width: 252, flexShrink: 0,
+      width: collapsed ? 40 : 288,
+      flexShrink: 0,
       borderLeft: '1px solid rgba(255,255,255,0.05)',
       background: '#0c0c0c',
       display: 'flex', flexDirection: 'column', overflow: 'hidden',
+      transition: 'width 0.22s ease',
     }}>
-      <div style={{ padding: '14px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: '#444', textTransform: 'uppercase', letterSpacing: '0.14em' }}>
-          Team · {members.length}
-        </span>
-        <button
-          onClick={onOpenRoleManager}
-          style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: '1px solid rgba(255,255,255,0.07)', color: '#444', cursor: 'pointer', padding: '4px 8px', transition: 'all 0.15s' }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,85,0,0.35)'; e.currentTarget.style.color = '#ff5500'; }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = '#444'; }}
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: 13 }}>manage_accounts</span>
-          <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Roles</span>
-        </button>
+
+      {/* Header */}
+      <div style={{
+        height: 44, flexShrink: 0,
+        borderBottom: '1px solid rgba(255,255,255,0.05)',
+        display: 'flex', alignItems: 'center',
+        justifyContent: collapsed ? 'center' : 'space-between',
+        padding: collapsed ? 0 : '0 14px',
+        gap: 6,
+      }}>
+        {!collapsed && (
+          <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: '#444', textTransform: 'uppercase', letterSpacing: '0.14em', whiteSpace: 'nowrap' }}>
+            Team · {members.length}
+          </span>
+        )}
+
+        {!collapsed && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button
+              onClick={onOpenRoleManager}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: '1px solid rgba(255,255,255,0.07)', color: '#444', cursor: 'pointer', padding: '4px 8px', transition: 'all 0.15s' }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,85,0,0.35)'; e.currentTarget.style.color = '#ff5500'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = '#444'; }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 13 }}>manage_accounts</span>
+              <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Roles</span>
+            </button>
+            <button
+              onClick={onToggle}
+              title="Collapse"
+              style={{ display: 'flex', alignItems: 'center', background: 'none', border: '1px solid rgba(255,255,255,0.1)', color: '#666', cursor: 'pointer', padding: '4px 6px', transition: 'all 0.15s' }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)'; e.currentTarget.style.color = '#ccc'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = '#666'; }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 15 }}>chevron_right</span>
+            </button>
+          </div>
+        )}
+
+        {collapsed && (
+          <button
+            onClick={onToggle}
+            title="Expand team"
+            style={{ display: 'flex', alignItems: 'center', background: 'none', border: '1px solid rgba(255,255,255,0.1)', color: '#666', cursor: 'pointer', padding: '4px 6px', transition: 'all 0.15s' }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)'; e.currentTarget.style.color = '#ccc'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = '#666'; }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 15 }}>chevron_left</span>
+          </button>
+        )}
       </div>
-      <div style={{ flex: 1, overflowY: 'auto', padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {members.map(m => (
-          <MemberCard key={m.id} member={m} allRoles={roles} memberRoles={memberRoles} onRoleToggle={onRoleToggle} />
-        ))}
-      </div>
+
+      {/* Body */}
+      {collapsed ? (
+        /* Collapsed: stacked avatars */
+        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '8px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, scrollbarWidth: 'none' }}>
+          {members.map(m => (
+            <div key={m.id} title={m.name}>
+              <Avatar member={m} size={24} />
+            </div>
+          ))}
+        </div>
+      ) : (
+        /* Expanded: full member cards */
+        <div style={{ flex: 1, overflowY: 'auto', padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {members.map(m => (
+            <MemberCard key={m.id} member={m} allRoles={roles} memberRoles={memberRoles} onRoleToggle={onRoleToggle} tasks={tasks} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -701,8 +906,10 @@ export default function Tasks() {
   const [filterPriority, setFilterPriority] = useState('');
   const [search,         setSearch]         = useState('');
   const [activeCol,      setActiveCol]      = useState('in_progress');
-  const [showFilters,    setShowFilters]    = useState(false);
-  const [showSidebar,    setShowSidebar]    = useState(false);
+  const [showFilters,      setShowFilters]      = useState(false);
+  const [showSidebar,      setShowSidebar]      = useState(false);
+  const [showAllDone,      setShowAllDone]      = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const dragId = useRef(null);
 
@@ -756,14 +963,43 @@ export default function Tasks() {
     e.dataTransfer.effectAllowed = 'move';
   };
 
-  const handleDrop = async (e, newStatus) => {
+  const handleDrop = async (e, newStatus, targetCardId = null) => {
     const id = dragId.current;
     dragId.current = null;
     if (!id) return;
     const task = tasks.find(t => t.id === id);
-    if (!task || task.status === newStatus) return;
-    setTasks(ts => ts.map(t => t.id === id ? { ...t, status: newStatus } : t));
-    await supabase.from('tasks').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', id);
+    if (!task) return;
+
+    if (task.status !== newStatus) {
+      setTasks(ts => ts.map(t => t.id === id ? { ...t, status: newStatus } : t));
+      await supabase.from('tasks').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', id);
+      return;
+    }
+
+    if (!targetCardId || targetCardId === id) return;
+
+    const colTasks = tasks
+      .filter(t => t.status === newStatus)
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+
+    const fromIdx = colTasks.findIndex(t => t.id === id);
+    const toIdx   = colTasks.findIndex(t => t.id === targetCardId);
+    if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return;
+
+    const reordered = [...colTasks];
+    reordered.splice(fromIdx, 1);
+    reordered.splice(toIdx, 0, colTasks[fromIdx]);
+
+    const updates = reordered.map((t, i) => ({ id: t.id, position: i + 1 }));
+
+    setTasks(ts => ts.map(t => {
+      const u = updates.find(upd => upd.id === t.id);
+      return u ? { ...t, position: u.position } : t;
+    }));
+
+    await Promise.all(
+      updates.map(u => supabase.from('tasks').update({ position: u.position }).eq('id', u.id))
+    );
   };
 
   // ── Role CRUD ──
@@ -801,7 +1037,18 @@ export default function Tasks() {
     return true;
   });
 
-  const byCol = Object.fromEntries(COLUMNS.map(c => [c.id, filtered.filter(t => t.status === c.id)]));
+  const doneTasks   = filtered.filter(t => t.status === 'done');
+  const hiddenDone  = doneTasks.filter(isDoneAutoArchived);
+  const visibleDone = showAllDone ? doneTasks : doneTasks.filter(t => !isDoneAutoArchived(t));
+
+  const byCol = Object.fromEntries(
+    COLUMNS.map(c => [c.id, c.id === 'done'
+      ? visibleDone
+      : filtered.filter(t => t.status === c.id)
+    ])
+  );
+
+  useEffect(() => { setShowAllDone(false); }, [filterMember, filterPriority, search]);
 
   const inProgress = tasks.filter(t => t.status === 'in_progress').length;
   const overdue = tasks.filter(t => {
@@ -1051,6 +1298,8 @@ export default function Tasks() {
                 onDrop={handleDrop}
                 onAddTask={status => setModalTask({ status })}
                 fullWidth
+                hiddenCount={activeCol === 'done' ? hiddenDone.length : 0}
+                onShowHidden={() => setShowAllDone(true)}
               />
             ) : (
               /* Desktop: horizontal scroll with all columns */
@@ -1065,6 +1314,8 @@ export default function Tasks() {
                     onDragStart={handleDragStart}
                     onDrop={handleDrop}
                     onAddTask={status => setModalTask({ status })}
+                    hiddenCount={col.id === 'done' ? hiddenDone.length : 0}
+                    onShowHidden={() => setShowAllDone(true)}
                   />
                 ))}
               </div>
@@ -1079,6 +1330,9 @@ export default function Tasks() {
               memberRoles={memberRoles}
               onRoleToggle={handleRoleToggle}
               onOpenRoleManager={() => setShowRoles(true)}
+              collapsed={sidebarCollapsed}
+              onToggle={() => setSidebarCollapsed(v => !v)}
+              tasks={tasks}
             />
           )}
         </div>
@@ -1105,6 +1359,7 @@ export default function Tasks() {
                 memberRoles={memberRoles}
                 onRoleToggle={handleRoleToggle}
                 onOpenRoleManager={() => { setShowSidebar(false); setShowRoles(true); }}
+                tasks={tasks}
               />
             </div>
           </div>

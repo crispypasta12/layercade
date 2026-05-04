@@ -7,7 +7,7 @@ import { parseProductImages } from '../lib/productImages';
 import { supabase } from '../lib/supabase';
 
 const PRODUCT_CARD_COLUMNS =
-  'id, name, slug, description, price, category, image, images, featured, new_arrival, stock_status, sort_order, has_color_variants';
+  'id, name, slug, description, price, category, image, images, featured, new_arrival, stock_status, sort_order, has_color_variants, material';
 
 const PRODUCT_COLORS_COLUMNS =
   'id, color_id, name, hex, image, images, price, stock_status, sort_order, is_active';
@@ -55,7 +55,7 @@ function toProduct(row) {
     sale:         false,
     originalPrice: null,
     // Kept for ProductModalPage
-    material:    null,
+    material:    row.material ?? null,
     color:       null,
     subcategory: null,
     rating:      0,

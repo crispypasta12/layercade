@@ -125,19 +125,26 @@ export default function ProductCard({ product, location }) {
           })()}
 
           {/* Stars */}
-          <div className="flex items-center gap-0.5 text-orange-500 text-xs">
-            {[1, 2, 3, 4, 5].map((star) => (
-              <span
-                key={star}
-                className="material-symbols-outlined"
-                style={{
-                  fontSize: 14,
-                  fontVariationSettings: `'FILL' ${star <= product.rating ? 1 : 0}`,
-                }}
-              >
-                star
+          <div className="flex items-center gap-1 text-orange-500 text-xs">
+            <div className="flex gap-0.5">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <span
+                  key={star}
+                  className="material-symbols-outlined"
+                  style={{
+                    fontSize: 14,
+                    fontVariationSettings: `'FILL' ${star <= product.rating ? 1 : 0}`,
+                  }}
+                >
+                  star
+                </span>
+              ))}
+            </div>
+            {product.reviewCount > 0 && (
+              <span className="font-technical text-[9px] text-stone-600">
+                ({product.reviewCount})
               </span>
-            ))}
+            )}
           </div>
 
           {/* Price */}

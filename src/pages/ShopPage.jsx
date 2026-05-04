@@ -5,6 +5,30 @@ import { useCategories } from '../lib/useCategories';
 import { fetchProductsByCategory } from '../data/products';
 import ProductCard, { fadeUp } from '../components/ProductCard';
 import { isParentSlug, subCategoryNamesForParent } from '../lib/categories';
+import { supabase } from '../lib/supabase';
+
+async function fetchRatingsForProducts(productIds) {
+  if (!productIds.length) return {};
+  const { data } = await supabase
+    .from('reviews')
+    .select('product_id, rating')
+    .in('product_id', productIds)
+    .eq('status', 'approved');
+  if (!data) return {};
+  const map = {};
+  data.forEach(({ product_id, rating }) => {
+    if (!map[product_id]) map[product_id] = [];
+    map[product_id].push(rating);
+  });
+  const result = {};
+  Object.entries(map).forEach(([id, ratings]) => {
+    result[id] = {
+      rating: Math.round(ratings.reduce((s, r) => s + r, 0) / ratings.length),
+      reviewCount: ratings.length,
+    };
+  });
+  return result;
+}
 
 const PER_PAGE = 12;
 
@@ -285,9 +309,15 @@ export default function ShopPage() {
       sort,
       priceMin,
       priceMax,
-    }).then(({ products: p, total: t }) => {
+    }).then(async ({ products: p, total: t }) => {
       if (!isMounted) return;
-      setProducts(p);
+      const ratingsMap = await fetchRatingsForProducts(p.map((pr) => pr.id));
+      const withRatings = p.map((pr) => ({
+        ...pr,
+        rating:      ratingsMap[pr.id]?.rating      ?? 0,
+        reviewCount: ratingsMap[pr.id]?.reviewCount ?? 0,
+      }));
+      setProducts(withRatings);
       setTotal(t);
       setLoading(false);
     });

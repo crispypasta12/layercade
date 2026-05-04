@@ -3,7 +3,6 @@ import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FloatingPaths } from '@/components/ui/background-paths';
 import ProductCard, { fadeUp } from '../components/ProductCard';
-import ParallaxSection from '@/components/ui/parallax-section';
 
 /* ─── Constants ──────────────────────────────────────────────── */
 const TW_WORDS = ['PLA', 'PETG', 'TPU', 'RESIN', 'ASA AERO', 'FLEX'];
@@ -184,46 +183,26 @@ export default function LandingPage() {
               Get a Quote
             </Link>
           </div>
-        </div>
 
-      </section>
-
-      {/* ── PARALLAX TRANSITION ──────────────────────────────── */}
-      <ParallaxSection />
-
-      {/* ── 02 TRUST BAR ─────────────────────────────────────── */}
-      <section className="py-10 bg-[#111111] relative z-30">
-        <motion.div
-          className="max-w-7xl mx-auto px-8"
-          variants={stagger}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: true, margin: '-60px' }}
-        >
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+          {/* Trust stats strip */}
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
             {[
-              { icon: 'precision_manufacturing', stat: '100+',      label: 'Products' },
-              { icon: 'local_shipping',          stat: 'Same-Week', label: 'Delivery' },
-              { icon: 'layers',                  stat: 'Premium',   label: 'Materials' },
-              { icon: 'edit_square',             stat: 'Custom',    label: 'Orders' },
-            ].map(({ icon, stat, label }) => (
-              <motion.div
-                key={label}
-                variants={fadeUp}
-                className="flex flex-col items-center text-center group"
-              >
-                <span
-                  className="material-symbols-outlined text-[#ff5500] mb-2 group-hover:scale-110 transition-transform"
-                  style={{ fontSize: 36 }}
-                >
-                  {icon}
-                </span>
-                <span className="font-headline text-4xl text-white">{stat}</span>
-                <span className="font-technical text-xs text-stone-500 uppercase">{label}</span>
-              </motion.div>
+              { stat: '100+', label: 'Products' },
+              { stat: 'Same-Week', label: 'Delivery' },
+              { stat: 'Premium', label: 'Materials' },
+              { stat: 'Custom', label: 'Orders' },
+            ].map(({ stat, label }, i) => (
+              <div key={label} className="flex items-center gap-4">
+                <div className="text-center">
+                  <span className="font-headline text-xl text-white block leading-none">{stat}</span>
+                  <span className="font-technical text-[9px] uppercase tracking-[0.2em] text-stone-500">{label}</span>
+                </div>
+                {i < 3 && <span className="text-white/10 font-technical select-none hidden sm:block">|</span>}
+              </div>
             ))}
           </div>
-        </motion.div>
+        </div>
+
       </section>
 
       {/* ── 03 COLLECTIONS ───────────────────────────────────── */}
@@ -232,8 +211,7 @@ export default function LandingPage() {
           className="mb-10"
           variants={fadeUp}
           initial="hidden"
-          whileInView="show"
-          viewport={{ once: true }}
+          animate="show"
           transition={{ duration: 0.6 }}
         >
           <span className="font-technical text-[#ff5500] text-lg">Collections</span>
@@ -250,8 +228,7 @@ export default function LandingPage() {
             className="flex gap-4 min-w-max"
             variants={stagger}
             initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, margin: '-80px' }}
+            animate="show"
           >
             {allCategories.map((cat, i) => (
               <motion.div

@@ -12,6 +12,7 @@ const STATUS_PIPELINE = [
   { key: 'shipped',   label: 'Shipped',   color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/30' },
   { key: 'delivered', label: 'Delivered', color: 'text-green-400',  bg: 'bg-green-500/10',  border: 'border-green-500/30' },
   { key: 'cancelled', label: 'Cancelled', color: 'text-red-400',    bg: 'bg-red-500/10',    border: 'border-red-500/30' },
+  { key: 'returned',  label: 'Returned',  color: 'text-amber-400',  bg: 'bg-amber-500/10',  border: 'border-amber-500/30' },
 ];
 
 const EXPENSE_CATEGORIES = [

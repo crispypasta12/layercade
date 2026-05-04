@@ -5,6 +5,8 @@ import { supabase } from '../../lib/supabase';
 import { useCategories } from '../../lib/useCategories';
 import { useColors } from '../../lib/useColors';
 
+const MATERIAL_OPTIONS = ['PLA Basic', 'PLA Matte', 'PLA Metal', 'PLA Galaxy', 'PETG', 'TPU', 'Resin', 'ABS'];
+
 const STOCK_OPTIONS = [
   { value: 'in_stock', label: 'In Stock' },
   { value: 'out_of_stock', label: 'Out of Stock' },
@@ -279,6 +281,7 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
   const [costPrice, setCostPrice] = useState(product?.cost_price != null ? String(product.cost_price) : '');
   const [category, setCategory] = useState(product?.category ?? '');
   const [stockStatus, setStockStatus] = useState(product?.stock_status ?? 'in_stock');
+  const [material, setMaterial] = useState(product?.material ?? '');
   const [featured, setFeatured] = useState(product?.featured ?? false);
   const [newArrival, setNewArrival] = useState(product?.new_arrival ?? false);
   const [imageUrls, setImageUrls] = useState(initialImages);
@@ -557,6 +560,7 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
       category,
       image: imageUrls[0] ?? '',
       images: imageUrls,
+      material: material || null,
       featured,
       new_arrival: newArrival,
       stock_status: stockStatus,
@@ -825,6 +829,23 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
               </div>
             </Field>
           </div>
+
+          <Field label="Material">
+            <div className="relative">
+              <select
+                value={material}
+                onChange={(e) => setMaterial(e.target.value)}
+                disabled={isFormLocked}
+                className={inputClass + ' appearance-none cursor-pointer pr-8'}
+              >
+                <option value="" className="bg-[#161616]">— Not specified —</option>
+                {MATERIAL_OPTIONS.map((m) => (
+                  <option key={m} value={m} className="bg-[#161616]">{m}</option>
+                ))}
+              </select>
+              <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-stone-500" style={{ fontSize: 16 }}>expand_more</span>
+            </div>
+          </Field>
 
           <Field label="Product Images *" error={fieldErrors.image ?? uploadError}>
             {(imageUrls.length > 0 || uploading) && (

@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { getProductBySlug, getRelatedProducts, resolveProductView } from '../data/products';
 import { useCartStore } from '../store/cartStore';
+import ReviewsSection from '../components/ReviewsSection';
 
 function formatStockStatus(status) {
   if (!status) return 'Made to Order';
@@ -254,10 +255,31 @@ export default function ProductModalPage() {
               </p>
             </div>
 
+            {/* Material + Delivery */}
+            <div className="mt-4 border border-white/10 bg-[#141414] divide-y divide-white/5">
+              {product.material && (
+                <div className="flex items-center justify-between px-5 py-3">
+                  <span className="font-technical text-[10px] uppercase tracking-[0.25em] text-stone-500">Material</span>
+                  <span className="font-technical text-[10px] uppercase tracking-[0.15em] text-stone-300">{product.material}</span>
+                </div>
+              )}
+              <div className="px-5 py-3">
+                <p className="font-technical text-[10px] uppercase tracking-[0.25em] text-stone-500 mb-2">Delivery Cost &amp; Time</p>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-technical text-[10px] text-stone-400">Inside Dhaka</span>
+                    <span className="font-technical text-[10px] text-stone-300">60৳ &nbsp;·&nbsp; 3–4 working days</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-technical text-[10px] text-stone-400">Outside Dhaka</span>
+                    <span className="font-technical text-[10px] text-stone-300">120৳ &nbsp;·&nbsp; 4–5 working days</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div className="mt-8 grid gap-3 text-sm text-stone-300">
               {[
-                'Typical lead time: 1-2 business days for standard orders.',
-                'Cash on delivery checkout is available.',
                 'Need a custom size or finish? Use Get a Quote before ordering.',
               ].map((note) => (
                 <div key={note} className="flex gap-3 border border-white/8 bg-[#141414] px-4 py-3">
@@ -382,6 +404,9 @@ export default function ProductModalPage() {
             </div>
           </div>
         </div>
+
+        {/* ── Reviews ── */}
+        <ReviewsSection productId={product.id} />
 
         {/* ── Related products ── */}
         {relatedProducts.length > 0 && (

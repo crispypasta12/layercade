@@ -12,6 +12,7 @@ const STATUS_OPTIONS = [
   { value: 'shipped',   label: 'Shipped' },
   { value: 'delivered', label: 'Delivered' },
   { value: 'cancelled', label: 'Cancelled' },
+  { value: 'returned',  label: 'Returned' },
 ];
 
 const STATUS_COLORS = {
@@ -20,6 +21,7 @@ const STATUS_COLORS = {
   shipped:   { bg: 'bg-purple-500/20', text: 'text-purple-400', label: 'Shipped' },
   delivered: { bg: 'bg-green-500/20',  text: 'text-green-400',  label: 'Delivered' },
   cancelled: { bg: 'bg-red-500/20',    text: 'text-red-400',    label: 'Cancelled' },
+  returned:  { bg: 'bg-amber-500/20',  text: 'text-amber-400',  label: 'Returned' },
 };
 
 /* ─── Helpers ────────────────────────────────────────────────────── */
@@ -619,8 +621,9 @@ function OrderInvoiceTemplate({ order }) {
     shipped:   { background: '#f5f3ff', color: '#6d28d9' },
     delivered: { background: '#f0fdf4', color: '#166534' },
     cancelled: { background: '#fef2f2', color: '#991b1b' },
+    returned:  { background: '#fffbeb', color: '#92400e' },
   };
-  const statusLabels = { pending: 'Pending', confirmed: 'Confirmed', shipped: 'Shipped', delivered: 'Paid', cancelled: 'Cancelled' };
+  const statusLabels = { pending: 'Pending', confirmed: 'Confirmed', shipped: 'Shipped', delivered: 'Paid', cancelled: 'Cancelled', returned: 'Returned' };
 
   const fmt = (n) => `৳${(Number(n) || 0).toLocaleString('en-IN')}`;
   const fmtD = (iso) => {

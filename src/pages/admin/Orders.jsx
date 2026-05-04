@@ -23,6 +23,7 @@ const STATUS_OPTIONS = [
   { value: 'shipped',   label: 'Shipped' },
   { value: 'delivered', label: 'Delivered' },
   { value: 'cancelled', label: 'Cancelled' },
+  { value: 'returned',  label: 'Returned' },
 ];
 
 const STATUS_COLORS = {
@@ -31,6 +32,7 @@ const STATUS_COLORS = {
   shipped:   { bg: 'bg-purple-500/20', text: 'text-purple-400', label: 'Shipped' },
   delivered: { bg: 'bg-green-500/20',  text: 'text-green-400',  label: 'Delivered' },
   cancelled: { bg: 'bg-red-500/20',    text: 'text-red-400',    label: 'Cancelled' },
+  returned:  { bg: 'bg-amber-500/20',  text: 'text-amber-400',  label: 'Returned' },
 };
 
 /* ─── Helpers ────────────────────────────────────────────────────── */
@@ -137,7 +139,7 @@ export default function AdminOrders() {
   const pendingOrders  = orders.filter((o) => o.status === 'pending').length;
   const completedOrders = orders.filter((o) => o.status === 'delivered').length;
   const totalRevenue   = orders
-    .filter((o) => o.status !== 'cancelled')
+    .filter((o) => o.status !== 'cancelled' && o.status !== 'returned')
     .reduce((sum, o) => sum + (o.total_amount ?? 0), 0);
 
   /* ── Pagination ─────────────────────────────────────────────── */

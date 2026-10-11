@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Suspense, lazy, useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
@@ -26,7 +26,7 @@ const CostCalculator = lazy(() => import('./pages/admin/CostCalculator'));
 const InvoiceMaker = lazy(() => import('./pages/admin/InvoiceMaker'));
 const AdminTasks = lazy(() => import('./pages/admin/Tasks'));
 const AdminExpenses = lazy(() => import('./pages/admin/Expenses'));
-const AdminColors   = lazy(() => import('./pages/admin/Colors'));
+const AdminInventory = lazy(() => import('./pages/admin/Inventory'));
 const AdminReviews  = lazy(() => import('./pages/admin/Reviews'));
 
 function RouteFallback() {
@@ -152,13 +152,14 @@ export default function App() {
           }
         />
         <Route
-          path="/admin/colors"
+          path="/admin/inventory"
           element={
             <ProtectedRoute>
-              <AdminColors />
+              <AdminInventory />
             </ProtectedRoute>
           }
         />
+        <Route path="/admin/colors" element={<Navigate to="/admin/inventory" replace />} />
         <Route
           path="/admin/reviews"
           element={

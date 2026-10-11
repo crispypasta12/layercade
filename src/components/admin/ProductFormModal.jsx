@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { parseProductImages } from '../../lib/productImages';
 import { supabase } from '../../lib/supabase';
 import { useCategories } from '../../lib/useCategories';
-import { useColors } from '../../lib/useColors';
+import { useFilamentPalette } from '../../lib/useFilamentPalette';
 
 const MATERIAL_OPTIONS = ['PLA Basic', 'PLA Matte', 'PLA Metal', 'PLA Galaxy', 'PETG', 'TPU', 'Resin', 'ABS'];
 
@@ -51,27 +51,32 @@ function Field({ label, error, children }) {
   );
 }
 
-function ColorSwatchPicker({ colors, selectedId, onSelect, onClose }) {
+function ColorSwatchPicker({ colors, selectedHex, onSelect, onClose }) {
   return (
     <div
       className="absolute z-50 top-full left-0 mt-1 bg-[#1c1c1c] border border-white/10 p-3 shadow-2xl"
-      style={{ minWidth: 218 }}
+      style={{ minWidth: 260 }}
     >
-      <p className="font-technical text-[9px] uppercase tracking-widest text-stone-600 mb-2">Pick from palette</p>
-      <div className="grid grid-cols-5 gap-1.5 mb-3">
+      <p className="font-technical text-[9px] uppercase tracking-widest text-stone-600 mb-2">Pick from filament inventory</p>
+      <div className="max-h-64 overflow-y-auto -mx-1 mb-3">
+        {colors.length === 0 && (
+          <p className="font-body text-xs text-stone-500 px-1 py-2">No filament in stock — add spools in Inventory.</p>
+        )}
         {colors.map((c) => (
           <button
-            key={c.id}
+            key={c.key}
             type="button"
             onClick={() => { onSelect(c); onClose(); }}
-            title={c.name}
-            className={`w-8 h-8 border-2 transition-all ${
-              selectedId === c.id
-                ? 'border-[#ff5500] scale-110'
-                : 'border-transparent hover:border-white/40'
+            className={`w-full flex items-center gap-2.5 px-1 py-1.5 text-left transition-colors hover:bg-white/5 ${
+              selectedHex?.toLowerCase() === c.hex.toLowerCase() ? 'bg-[#ff5500]/10' : ''
             }`}
-            style={{ background: c.hex }}
-          />
+          >
+            <span className="w-6 h-6 flex-shrink-0 border border-white/20" style={{ background: c.hex }} />
+            <span className="min-w-0">
+              <span className="block font-body text-xs text-white truncate">{c.name}</span>
+              <span className="block font-technical text-[9px] text-stone-500 truncate">{c.detail} · {c.hex.toUpperCase()}</span>
+            </span>
+          </button>
         ))}
       </div>
       <button
@@ -114,15 +119,16 @@ function VariantRow({
             type="button"
             onClick={() => !disabled && setPickerOpen((v) => !v)}
             disabled={disabled}
-            title="Pick from global palette"
+            title="Pick from filament inventory"
             className="w-9 h-9 border border-white/10 hover:border-[#ff5500]/60 transition-colors flex-shrink-0"
             style={{ background: safeHex }}
           />
           {pickerOpen && (
             <ColorSwatchPicker
               colors={globalColors}
-              selectedId={variant.color_id}
-              onSelect={(c) => onChange({ color_id: c.id, hex: c.hex, name: variant.name || c.name })}
+              selectedHex={variant.hex}
+              // color_id references the old colors table, so filament picks don't set it.
+              onSelect={(c) => onChange({ color_id: null, hex: c.hex, name: variant.name || c.name })}
               onClose={() => setPickerOpen(false)}
             />
           )}
@@ -271,7 +277,7 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
   const isEdit = product !== null;
   const initialImages = parseProductImages(product?.image, product?.images);
   const { parentCategories, subCategories } = useCategories();
-  const { colors: globalColors } = useColors();
+  const { colors: globalColors } = useFilamentPalette();
 
   // Product fields
   const [name, setName] = useState(product?.name ?? '');

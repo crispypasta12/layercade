@@ -192,21 +192,10 @@ export default function Checkout() {
       return;
     }
 
-    // Fire-and-forget — don't block navigation if email fails
+    // Fire-and-forget — don't block navigation if email fails.
+    // Only the id is sent; the function reads the order from the database.
     supabase.functions.invoke('send-order-confirmation', {
-      body: {
-        order: {
-          id:            orderId,
-          customer_name: form.fullName.trim(),
-          email:         form.email.trim().toLowerCase(),
-          items,
-          total_amount:  grandTotal,
-          delivery_fee:  deliveryFee,
-          address:       form.address.trim(),
-          area:          form.area.trim(),
-          district:      form.district,
-        },
-      },
+      body: { orderId },
     });
 
     navigate('/order-confirmation', {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { CurrentMemberProvider } from '../contexts/CurrentMemberContext';
+import { CurrentMemberProvider, useCurrentMember } from '../contexts/CurrentMemberContext';
 import WelcomeGuard from './admin/WelcomeScreen';
 
 export default function ProtectedRoute({ children }) {
@@ -36,9 +36,53 @@ export default function ProtectedRoute({ children }) {
 
   return (
     <CurrentMemberProvider session={session}>
-      <WelcomeGuard>
-        {children}
-      </WelcomeGuard>
+      <MemberGuard>
+        <WelcomeGuard>
+          {children}
+        </WelcomeGuard>
+      </MemberGuard>
     </CurrentMemberProvider>
   );
+}
+
+/**
+ * A session alone is not authorization — it only proves someone signed up.
+ * The real gate is RLS (see supabase/migrations/*_restrict_admin_to_members),
+ * this just stops a non-member loading an admin screen that would fail to
+ * fetch anything anyway.
+ */
+function MemberGuard({ children }) {
+  const { member, loading } = useCurrentMember();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#080808] flex items-center justify-center">
+        <svg className="animate-spin w-8 h-8 text-[#ff5500]" viewBox="0 0 24 24" fill="none">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+        </svg>
+      </div>
+    );
+  }
+
+  if (!member) {
+    return (
+      <div className="min-h-screen bg-[#080808] flex flex-col items-center justify-center gap-6 px-8 text-center">
+        <span className="font-technical text-[10px] text-stone-500 uppercase tracking-widest border border-white/10 px-2 py-1">
+          Access denied
+        </span>
+        <p className="font-body text-stone-400 text-sm max-w-sm leading-relaxed">
+          This account is not a member of the Layercade team.
+        </p>
+        <button
+          onClick={() => supabase.auth.signOut()}
+          className="font-headline text-xl text-[#ff5500] hover:text-white transition-colors"
+        >
+          SIGN OUT
+        </button>
+      </div>
+    );
+  }
+
+  return children;
 }

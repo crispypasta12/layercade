@@ -4,4 +4,4 @@ Disallow: /admin
 Disallow: /checkout
 Disallow: /order-confirmation
 
-Sitemap: https://layercade.com/sitemap.xml
+Sitemap: https://www.layercade.com/sitemap.xml

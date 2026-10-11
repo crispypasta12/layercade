@@ -134,42 +134,33 @@ export default function LandingPage() {
   return (
     <main>
       {/* ── 01 HERO ──────────────────────────────────────────────── */}
-      <section className="relative min-h-[60vh] flex flex-col items-center justify-center orange-grid overflow-hidden pt-[calc(36px+80px)]">
+      <section className="relative md:min-h-[50vh] flex flex-col items-center justify-center orange-grid overflow-hidden pt-[calc(36px+80px+2.5rem)] pb-12">
         <div className="absolute inset-0 text-[#ff5500]">
           <FloatingPaths position={1} />
           <FloatingPaths position={-1} />
         </div>
 
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#080808]/60 to-[#080808] pointer-events-none" />
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-[#ff5500] blur-[140px] opacity-15 pointer-events-none" />
 
-        <div className="relative w-48 h-48 md:w-64 md:h-64 z-10">
-          <div className="absolute inset-0 bg-[#ff5500] blur-[120px] opacity-25 animate-pulse" />
-          <img
-            src="/logo.png"
-            alt="Layercade"
-            fetchPriority="high"
-            decoding="async"
-            className="relative w-full h-full object-contain drop-shadow-[0_0_40px_rgba(255,85,0,0.5)]"
-          />
-        </div>
-
-        <div className="z-20 text-center mt-4 px-4">
+        <div className="relative z-20 text-center px-4">
           <h1 className="font-headline text-5xl md:text-7xl leading-none tracking-tighter text-white">
             PRECISION.<br />LAYER BY LAYER.
           </h1>
 
           <div
-            className="font-technical text-xl md:text-2xl mt-4 flex items-center justify-center gap-2
-                        tracking-[0.2em] uppercase"
+            className="font-technical text-base md:text-2xl mt-4 flex items-center justify-center gap-2
+                        tracking-[0.15em] md:tracking-[0.2em] uppercase whitespace-nowrap"
           >
             <span style={{ color: '#555' }}>NOW PRINTING IN </span>
-            <span className="text-[#ff5500] font-bold typewriter-cursor">{twText}</span>
+            {/* Fixed width (longest word) so the line doesn't shift while typing */}
+            <span className="inline-block min-w-[9ch] text-left text-[#ff5500] font-bold typewriter-cursor">{twText}</span>
           </div>
 
-          <div className="flex flex-col md:flex-row gap-6 mt-8 justify-center">
+          <div className="flex flex-row gap-3 md:gap-6 mt-8 justify-center">
             <Link
               to="/shop"
-              className="clip-parallelogram bg-[#ff5500] text-white px-12 py-4 font-headline text-3xl
+              className="clip-parallelogram bg-[#ff5500] text-white px-7 py-3 md:px-12 md:py-4 font-headline text-xl md:text-3xl
                          hover:shadow-[0_0_30px_rgba(255,85,0,0.5)] transition-all flex items-center justify-center"
             >
               Shop Now
@@ -177,7 +168,7 @@ export default function LandingPage() {
             <Link
               to="/quote"
               className="clip-parallelogram border-2 border-orange-500/50 text-orange-500 bg-orange-500/5
-                         px-12 py-4 font-headline text-3xl hover:bg-orange-500/10 transition-all
+                         px-6 py-3 md:px-10 md:py-4 font-headline text-xl md:text-2xl hover:bg-orange-500/10 transition-all
                          flex items-center justify-center"
             >
               Get a Quote
@@ -185,7 +176,7 @@ export default function LandingPage() {
           </div>
 
           {/* Trust stats strip */}
-          <div className="mt-10 flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
+          <div className="mt-8 md:mt-10 flex flex-wrap items-center justify-center gap-x-5 md:gap-x-8 gap-y-3">
             {[
               { stat: '100+', label: 'Products' },
               { stat: 'Same-Week', label: 'Delivery' },

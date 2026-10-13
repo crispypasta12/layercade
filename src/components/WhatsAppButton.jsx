@@ -1,4 +1,6 @@
-const WA_NUMBER = '8801XXXXXXXXX';
+import { WHATSAPP_TOOLTIP } from '../lib/voice';
+
+const WA_NUMBER = '8801620869115';
 const WA_MESSAGE = encodeURIComponent("Hi, I'm interested in ordering from Layercade!");
 
 export default function WhatsAppButton() {
@@ -14,7 +16,7 @@ export default function WhatsAppButton() {
                    group-hover:opacity-100 transition-opacity duration-300
                    uppercase tracking-widest"
       >
-        Order via WhatsApp
+        {WHATSAPP_TOOLTIP}
       </div>
 
       {/* Button */}

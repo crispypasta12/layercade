@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FloatingPaths } from '@/components/ui/background-paths';
 import ProductCard, { fadeUp } from '../components/ProductCard';
+import { FAQ_JOKE } from '../lib/voice';
 
 /* ─── Constants ──────────────────────────────────────────────── */
 const TW_WORDS = ['PLA', 'PETG', 'TPU', 'RESIN', 'ASA AERO', 'FLEX'];
@@ -43,6 +44,7 @@ const FAQ_ITEMS = [
     q: 'Can you design a 3D model for me?',
     a: 'Yes! Our engineers can assist with basic modifications or full custom modeling for an additional fee.',
   },
+  FAQ_JOKE,
 ];
 
 /* ─── Animation Variants ─────────────────────────────────────── */

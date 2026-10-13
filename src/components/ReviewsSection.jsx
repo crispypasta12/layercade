@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { REVIEWS_QUIP, REVIEWS_EMPTY_QUIP } from '../lib/voice';
 
 const CLOUDINARY_URL = `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`;
 const UPLOAD_PRESET  = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
@@ -385,6 +386,11 @@ export default function ReviewsSection({ productId }) {
               </div>
             )}
           </div>
+          {!loading && (
+            <p className="mt-2 font-body text-sm text-stone-500">
+              {reviews.length === 0 ? REVIEWS_EMPTY_QUIP : REVIEWS_QUIP}
+            </p>
+          )}
         </div>
         <button
           type="button"

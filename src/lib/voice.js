@@ -81,3 +81,21 @@ export const AWAY_TITLES = [
 ];
 
 export const SPAGHETTI_MODE = 'SPAGHETTI MODE ENGAGED. Bed adhesion: lost. Dignity: also lost.';
+
+export const FAQ_JOKE = {
+  q: 'What happens to failed prints?',
+  a: 'They go to a better place. The better place is a bin. We hold a short service.',
+};
+
+export const WHATSAPP_TOOLTIP = 'Talk to a human. Real one. Probably awake.';
+
+// Keyed by step title on the Process page
+export const PROCESS_ASIDES = {
+  'Upload Your File': 'We open every file. Yes, even that one.',
+  'Review & Quote':   'An engineer squints at your model and says "hmm". This is a professional "hmm".',
+  'Print & Quality':  'This takes hours. We watch it the whole time. We have no hobbies.',
+  'Ship to You':      'Wrapped like it owes us money. Then it meets Dhaka traffic.',
+};
+
+export const REVIEWS_QUIP       = 'Unpaid testimonials. We checked.';
+export const REVIEWS_EMPTY_QUIP = 'No reviews yet. Be the first. We will be nervous.';

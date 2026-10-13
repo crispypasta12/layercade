@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
+import { PROCESS_ASIDES } from '../lib/voice';
 
 /* ─── Step Data ──────────────────────────────────────────────── */
 
@@ -150,7 +151,12 @@ export default function Process() {
                 <h3 className="font-headline text-3xl text-white mb-4 tracking-wide">
                   {step.title}
                 </h3>
-                <p className="text-stone-400 text-sm leading-relaxed mb-6">{step.desc}</p>
+                <p className="text-stone-400 text-sm leading-relaxed mb-3">{step.desc}</p>
+                {PROCESS_ASIDES[step.title] && (
+                  <p className="font-technical text-[10px] text-[#ff5500]/70 leading-relaxed mb-6">
+                    // {PROCESS_ASIDES[step.title]}
+                  </p>
+                )}
 
                 {step.extra}
               </div>

@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { getProductBySlug, getRelatedProducts, resolveProductView } from '../data/products';
 import { useCartStore } from '../store/cartStore';
 import ReviewsSection from '../components/ReviewsSection';
+import { ADDED_TO_CART, pick } from '../lib/voice';
 
 function formatStockStatus(status) {
   if (!status) return 'Made to Order';
@@ -88,7 +89,8 @@ export default function ProductModalPage() {
       ? { id: resolvedProduct.activeVariant.id, name: resolvedProduct.activeVariant.name, hex: resolvedProduct.activeVariant.hex }
       : null;
     addItem(resolvedProduct, quantity, color);
-    setCartMessage(quantity === 1 ? 'Added to cart.' : `${quantity} items added to cart.`);
+    const added = quantity === 1 ? 'Added to cart.' : `${quantity} items added to cart.`;
+    setCartMessage(`${added} ${pick(ADDED_TO_CART)}`);
     setAddedToCart(true);
   };
 

@@ -7,6 +7,7 @@ import Navbar          from './components/Navbar';
 import Footer          from './components/Footer';
 import WhatsAppButton  from './components/WhatsAppButton';
 import ProtectedRoute  from './components/ProtectedRoute';
+import EasterEggs       from './components/EasterEggs';
 
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const Gallery = lazy(() => import('./pages/Gallery'));
@@ -17,6 +18,7 @@ const ProductModalPage = lazy(() => import('./pages/ProductModalPage'));
 const ShopPage = lazy(() => import('./pages/ShopPage'));
 const Checkout = lazy(() => import('./pages/Checkout'));
 const OrderConfirmation = lazy(() => import('./pages/OrderConfirmation'));
+const NotFound = lazy(() => import('./pages/NotFound'));
 const AdminLogin = lazy(() => import('./pages/admin/Login'));
 const AdminDashboard = lazy(() => import('./pages/admin/Dashboard'));
 const AdminOrders = lazy(() => import('./pages/admin/Orders'));
@@ -64,6 +66,7 @@ function Layout() {
           <Route path="/shop/:categorySlug" element={<ShopPage />} />
           <Route path="/checkout"            element={<Checkout />} />
           <Route path="/order-confirmation" element={<OrderConfirmation />} />
+          <Route path="*"                   element={<NotFound />} />
         </Routes>
         <AnimatePresence>
           {backgroundLocation && (
@@ -75,6 +78,7 @@ function Layout() {
       </Suspense>
       <Footer />
       <WhatsAppButton />
+      <EasterEggs />
     </div>
   );
 }

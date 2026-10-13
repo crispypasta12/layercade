@@ -1,6 +1,17 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { FOOTER_TAGLINE, FOOTER_STATS, COPYRIGHT_QUIP } from '../lib/voice';
+
+const STATS_SHOWN = 4;
 
 export default function Footer() {
+  // Rotate which "system stats" are visible on each hover
+  const [statOffset, setStatOffset] = useState(0);
+  const stats = Array.from(
+    { length: STATS_SHOWN },
+    (_, i) => FOOTER_STATS[(statOffset + i) % FOOTER_STATS.length]
+  );
+
   return (
     <footer className="bg-stone-950 relative overflow-hidden">
       {/* Orange gradient top border */}
@@ -13,8 +24,7 @@ export default function Footer() {
             Layercade
           </Link>
           <p className="font-body text-sm text-stone-500 leading-relaxed">
-            Pushing the boundaries of additive manufacturing. Precision engineering
-            for enthusiasts and industries.
+            {FOOTER_TAGLINE}
           </p>
           <div className="flex gap-4">
             <span className="material-symbols-outlined text-[#ff5500] hover:scale-110 transition-transform cursor-pointer select-none">
@@ -59,11 +69,13 @@ export default function Footer() {
         {/* Technical Specs */}
         <div className="flex flex-col gap-3">
           <h5 className="font-headline text-white text-xl tracking-wider mb-2">Technical</h5>
-          <div className="font-technical text-[10px] text-stone-600 space-y-1">
-            <p>STATUS: OPTIMAL</p>
-            <p>LATENCY: 12MS</p>
-            <p>UPTIME: 99.98%</p>
-            <p>LOCATION: DHAKA, BD</p>
+          <div
+            className="font-technical text-[10px] text-stone-600 space-y-1 cursor-default"
+            onMouseEnter={() => setStatOffset((o) => (o + STATS_SHOWN) % FOOTER_STATS.length)}
+          >
+            {stats.map(([label, value]) => (
+              <p key={label}>{label}: {value}</p>
+            ))}
           </div>
         </div>
 
@@ -89,7 +101,7 @@ export default function Footer() {
       {/* Bottom bar */}
       <div className="px-12 py-6 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4">
         <span className="font-body text-stone-600 text-xs">
-          © 2024 Layercade. Precision. Layer by Layer.
+          © {new Date().getFullYear()} Layercade. {COPYRIGHT_QUIP}
         </span>
         <div className="flex gap-8 font-technical text-[10px] text-stone-600">
           <span className="hover:text-[#ff5500] cursor-pointer transition-colors">Privacy_Policy</span>

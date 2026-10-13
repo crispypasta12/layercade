@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getCartLineKey, useCartStore } from '../store/cartStore';
+import { EMPTY_CART, pick } from '../lib/voice';
 
 export default function CartDrawer() {
   const { isCartOpen, closeCart, items, removeItem, updateQuantity } = useCartStore();
   const navigate = useNavigate();
   const [checkoutError, setCheckoutError] = useState(false);
+  const [emptyQuip] = useState(() => pick(EMPTY_CART));
 
   const totalAmount = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
   const totalItems  = items.reduce((sum, i) => sum + i.quantity, 0);
@@ -88,7 +90,7 @@ export default function CartDrawer() {
                   </span>
                   <p className="font-headline text-2xl text-stone-500">YOUR CART IS EMPTY</p>
                   <p className="font-body text-sm text-stone-600 mt-2">
-                    Add some products to get started
+                    {emptyQuip}
                   </p>
                 </div>
               ) : (

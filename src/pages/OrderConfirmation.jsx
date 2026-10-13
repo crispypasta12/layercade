@@ -1,12 +1,14 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useCartStore } from '../store/cartStore';
+import { ORDER_PLACED, pick } from '../lib/voice';
 
 export default function OrderConfirmation() {
   const location  = useLocation();
   const navigate  = useNavigate();
   const clearCart = useCartStore((state) => state.clearCart);
+  const [quip]    = useState(() => pick(ORDER_PLACED));
 
   const { orderId, customerName, totalAmount } = location.state || {};
 
@@ -71,6 +73,7 @@ export default function OrderConfirmation() {
             <p className="font-technical text-stone-500 text-sm uppercase tracking-widest">
               Thank you, {customerName}
             </p>
+            <p className="font-body text-stone-400 text-sm pt-2">{quip}</p>
           </motion.div>
 
           {/* Divider */}

@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { motion, useInView } from 'framer-motion';
 import { Link } from 'react-router-dom';
+import { MATERIAL_PERSONALITIES } from '../lib/voice';
 
 /* ─── Material Data ──────────────────────────────────────────── */
 
@@ -280,7 +281,12 @@ export default function Materials() {
                 </div>
 
                 <h2 className="font-headline text-6xl text-white mb-6">{mat.title}</h2>
-                <p className="font-body text-stone-400 max-w-md mb-8 leading-relaxed">{mat.desc}</p>
+                <p className="font-body text-stone-400 max-w-md mb-4 leading-relaxed">{mat.desc}</p>
+                {MATERIAL_PERSONALITIES[mat.name] && (
+                  <p className="font-technical text-[11px] text-[#ff5500]/80 max-w-md mb-8 leading-relaxed">
+                    {MATERIAL_PERSONALITIES[mat.name]}
+                  </p>
+                )}
 
                 {/* Animated property bars */}
                 <div className="mb-8 max-w-sm">

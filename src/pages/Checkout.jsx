@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { useCartStore } from '../store/cartStore';
+import { CHECKOUT_PHONE_QUIP, CHECKOUT_NOTES_PLACEHOLDER } from '../lib/voice';
 
 const DHAKA_FEE = 60;
 const OUTSIDE_FEE = 120;
@@ -447,7 +448,7 @@ export default function Checkout() {
               label="Phone Number"
               required
               error={errors.phone}
-              hint="Bangladesh number — 11 digits starting with 01"
+              hint={`Bangladesh number — 11 digits starting with 01. ${CHECKOUT_PHONE_QUIP}`}
             >
               <input
                 type="tel"
@@ -505,7 +506,7 @@ export default function Checkout() {
               <textarea
                 value={form.notes}
                 onChange={setField('notes')}
-                placeholder="Special instructions, preferred delivery time..."
+                placeholder={CHECKOUT_NOTES_PLACEHOLDER}
                 rows={3}
                 disabled={loading}
                 className={`${inputClass} resize-none`}

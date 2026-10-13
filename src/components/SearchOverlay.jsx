@@ -2,8 +2,10 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { searchProducts } from '../data/products';
+import { SEARCH_EMPTY, pick } from '../lib/voice';
 
 export default function SearchOverlay({ onClose }) {
+  const [emptyQuip] = useState(() => pick(SEARCH_EMPTY));
   const [query, setQuery]               = useState('');
   const [results, setResults]           = useState([]);
   const [loading, setLoading]           = useState(false);
@@ -64,6 +66,11 @@ export default function SearchOverlay({ onClose }) {
     setQuery(val);
     setSelectedIndex(-1);
     runSearch(val);
+  };
+
+  const handleQuote = () => {
+    onClose();
+    navigate('/quote');
   };
 
   const handleSelect = (product) => {
@@ -150,16 +157,26 @@ export default function SearchOverlay({ onClose }) {
         >
           <AnimatePresence mode="wait">
             {noResults && (
-              <motion.p
+              <motion.div
                 key="no-results"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="py-12 text-center font-technical text-[10px] uppercase
-                           tracking-[0.3em] text-stone-600"
+                className="py-12 text-center space-y-3"
               >
-                No products found for &ldquo;{query}&rdquo;
-              </motion.p>
+                <p className="font-technical text-[10px] uppercase tracking-[0.3em] text-stone-600">
+                  No products found for &ldquo;{query}&rdquo;
+                </p>
+                <p className="font-body text-sm text-stone-500">{emptyQuip}</p>
+                <button
+                  type="button"
+                  onClick={handleQuote}
+                  className="font-technical text-[10px] uppercase tracking-[0.3em] text-[#ff5500]
+                             hover:text-orange-300 transition-colors"
+                >
+                  Get a custom quote →
+                </button>
+              </motion.div>
             )}
 
             {results.length > 0 && (

@@ -1,5 +1,6 @@
-const TEXT =
-  'FREE DELIVERY OVER 1,000৳ IN DHAKA ◆ CASH ON DELIVERY AVAILABLE ◆ PREMIUM QUALITY 3D PRINTS ◆ CUSTOM ORDERS WELCOME ◆ SAME-WEEK TURNAROUND ◆ ';
+import { ANNOUNCEMENTS } from '../lib/voice';
+
+const TEXT = ANNOUNCEMENTS.map((line) => `${line} ◆ `).join('');
 
 export default function AnnouncementBar() {
   return (

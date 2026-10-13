@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { QUOTE_NAME_PLACEHOLDER, QUOTE_DETAILS_PLACEHOLDER } from '../lib/voice';
 
 /* ─── Constants ──────────────────────────────────────────────── */
 
@@ -228,7 +229,7 @@ export default function GetAQuote() {
                       type="text"
                       value={form.name}
                       onChange={set('name')}
-                      placeholder="Your Name"
+                      placeholder={QUOTE_NAME_PLACEHOLDER}
                       className={inputClass}
                     />
                   </Field>
@@ -295,7 +296,7 @@ export default function GetAQuote() {
                   <textarea
                     value={form.message}
                     onChange={set('message')}
-                    placeholder="Detailed specifications, quantity, and material preferences..."
+                    placeholder={QUOTE_DETAILS_PLACEHOLDER}
                     rows={4}
                     className={`${inputClass} resize-none`}
                   />

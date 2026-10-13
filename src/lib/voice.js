@@ -99,3 +99,5 @@ export const PROCESS_ASIDES = {
 
 export const REVIEWS_QUIP       = 'Unpaid testimonials. We checked.';
 export const REVIEWS_EMPTY_QUIP = 'No reviews yet. Be the first. We will be nervous.';
+
+export const HERO_QUIP = 'No layer lines were harmed. Some were mildly inconvenienced.';

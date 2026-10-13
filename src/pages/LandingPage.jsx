@@ -3,10 +3,10 @@ import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FloatingPaths } from '@/components/ui/background-paths';
 import ProductCard, { fadeUp } from '../components/ProductCard';
-import { FAQ_JOKE } from '../lib/voice';
+import { FAQ_JOKE, HERO_QUIP } from '../lib/voice';
 
 /* ─── Constants ──────────────────────────────────────────────── */
-const TW_WORDS = ['PLA', 'PETG', 'TPU', 'RESIN', 'ASA AERO', 'FLEX'];
+const TW_WORDS = ['KEYCAPS', 'DIORAMAS', 'DESK GEAR', 'ROOM DECOR', 'YOUR WEIRD IDEA'];
 
 
 const REVIEWS = [
@@ -151,12 +151,12 @@ export default function LandingPage() {
           </h1>
 
           <div
-            className="font-technical text-base md:text-2xl mt-4 flex items-center justify-center gap-2
+            className="font-technical text-sm md:text-2xl mt-4 flex items-center justify-center gap-2
                         tracking-[0.15em] md:tracking-[0.2em] uppercase whitespace-nowrap"
           >
-            <span style={{ color: '#555' }}>NOW PRINTING IN </span>
+            <span style={{ color: '#555' }}>NOW PRINTING:</span>
             {/* Fixed width (longest word) so the line doesn't shift while typing */}
-            <span className="inline-block min-w-[9ch] text-left text-[#ff5500] font-bold typewriter-cursor">{twText}</span>
+            <span className="inline-block min-w-[15ch] text-left text-[#ff5500] font-bold typewriter-cursor">{twText}</span>
           </div>
 
           <div className="flex flex-row gap-3 md:gap-6 mt-8 justify-center">
@@ -178,14 +178,14 @@ export default function LandingPage() {
           </div>
 
           {/* Trust stats strip */}
-          <div className="mt-8 md:mt-10 flex flex-wrap items-center justify-center gap-x-5 md:gap-x-8 gap-y-3">
+          <div className="mt-8 md:mt-10 grid grid-cols-2 gap-y-4 sm:flex sm:flex-wrap items-center justify-center sm:gap-x-8 sm:gap-y-3">
             {[
-              { stat: '100+', label: 'Products' },
-              { stat: 'Same-Week', label: 'Delivery' },
-              { stat: 'Premium', label: 'Materials' },
+              { stat: 'Cash', label: 'On Delivery' },
+              { stat: 'Free Delivery', label: 'Over 1,000৳ in Dhaka' },
+              { stat: '3–5 Days', label: 'Turnaround' },
               { stat: 'Custom', label: 'Orders' },
             ].map(({ stat, label }, i) => (
-              <div key={label} className="flex items-center gap-4">
+              <div key={label} className="flex items-center justify-center gap-4">
                 <div className="text-center">
                   <span className="font-headline text-xl text-white block leading-none">{stat}</span>
                   <span className="font-technical text-[9px] uppercase tracking-[0.2em] text-stone-500">{label}</span>
@@ -194,6 +194,10 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
+
+          <p className="mt-6 font-technical text-[10px] text-stone-600 tracking-[0.1em]">
+            {HERO_QUIP}
+          </p>
         </div>
 
       </section>

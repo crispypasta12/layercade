@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getCartLineKey, useCartStore } from '../store/cartStore';
 import { EMPTY_CART, pick } from '../lib/voice';
+import { getCartLinePrice, useNow } from '../lib/deals';
 
 export default function CartDrawer() {
   const { isCartOpen, closeCart, items, removeItem, updateQuantity } = useCartStore();
@@ -10,7 +11,8 @@ export default function CartDrawer() {
   const [checkoutError, setCheckoutError] = useState(false);
   const [emptyQuip] = useState(() => pick(EMPTY_CART));
 
-  const totalAmount = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  const now = useNow();
+  const totalAmount = items.reduce((sum, i) => sum + getCartLinePrice(i, now).price * i.quantity, 0);
   const totalItems  = items.reduce((sum, i) => sum + i.quantity, 0);
 
   /* Close on Escape */
@@ -96,6 +98,7 @@ export default function CartDrawer() {
               ) : (
                 items.map((item) => {
                   const lineKey = getCartLineKey(item);
+                  const { price, regularPrice, dealActive } = getCartLinePrice(item, now);
                   return (
                   <div
                     key={lineKey}
@@ -135,8 +138,18 @@ export default function CartDrawer() {
                           <span className="font-technical text-[10px] text-stone-500">{item.colorName}</span>
                         </div>
                       )}
-                      <p className="font-technical text-[#ff5500] text-sm mt-1">
-                        {item.price.toLocaleString('en-IN')}৳
+                      <p className="font-technical text-[#ff5500] text-sm mt-1 flex items-baseline gap-2">
+                        {price.toLocaleString('en-IN')}৳
+                        {dealActive && (
+                          <>
+                            <span className="text-stone-600 text-xs line-through">
+                              {regularPrice.toLocaleString('en-IN')}৳
+                            </span>
+                            <span className="text-[9px] uppercase tracking-widest bg-[#ff5500] text-black px-1.5">
+                              Deal
+                            </span>
+                          </>
+                        )}
                       </p>
 
                       {/* Qty controls */}
@@ -171,7 +184,7 @@ export default function CartDrawer() {
                         <span className="material-symbols-outlined" style={{ fontSize: 18 }}>delete</span>
                       </button>
                       <span className="font-headline text-lg text-white">
-                        {(item.price * item.quantity).toLocaleString('en-IN')}৳
+                        {(price * item.quantity).toLocaleString('en-IN')}৳
                       </span>
                     </div>
                   </div>

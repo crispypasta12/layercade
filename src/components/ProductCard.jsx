@@ -2,6 +2,8 @@ import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { resolveProductView } from '../data/products';
 import { useCartStore } from '../store/cartStore';
+import { useNow, withDeal } from '../lib/deals';
+import DealCountdown from './DealCountdown';
 
 export const fadeUp = {
   hidden: { opacity: 0, y: 40 },
@@ -18,7 +20,9 @@ function ImgPlaceholder({ category }) {
   );
 }
 
-export default function ProductCard({ product, location }) {
+export default function ProductCard({ product: baseProduct, location }) {
+  const now = useNow();
+  const product = withDeal(baseProduct, now);
   const hasImg = product.img1 !== null;
   const addItem  = useCartStore((state) => state.addItem);
   const openCart = useCartStore((state) => state.openCart);
@@ -26,7 +30,7 @@ export default function ProductCard({ product, location }) {
   const handleAddToCart = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    const resolvedProduct = resolveProductView(product);
+    const resolvedProduct = resolveProductView(baseProduct);
     const color = resolvedProduct.activeVariant
       ? {
           id: resolvedProduct.activeVariant.id,
@@ -44,12 +48,12 @@ export default function ProductCard({ product, location }) {
       className="product-card group relative bg-[#161616] border border-white/5 hover-glow transition-all duration-300 p-3 flex flex-col"
     >
       {/* Badges */}
-      {product.sale && !product.isNew && (
+      {product.dealActive && (
         <div className="absolute top-4 left-0 z-20 bg-[#ff5500] text-black px-4 py-1 font-headline text-sm clip-parallelogram">
-          SALE
+          DEAL
         </div>
       )}
-      {product.isNew && (
+      {product.isNew && !product.dealActive && (
         <div className="absolute top-4 left-0 z-20 border border-[#ff5500] text-[#ff5500] px-4 py-1 font-headline text-sm clip-parallelogram bg-black/80">
           NEW
         </div>
@@ -158,6 +162,7 @@ export default function ProductCard({ product, location }) {
               </span>
             )}
           </div>
+          <DealCountdown product={product} now={now} />
         </div>
       </Link>
 

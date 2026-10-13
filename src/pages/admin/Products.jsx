@@ -7,6 +7,7 @@ import ProductFormModal from '../../components/admin/ProductFormModal';
 import DeleteConfirmModal from '../../components/admin/DeleteConfirmModal';
 import Toast from '../../components/Toast';
 import { useCategories } from '../../lib/useCategories';
+import { formatDealRemaining, getDealInfo } from '../../lib/deals';
 
 const STOCK_OPTIONS = [
   { value: 'all',          label: 'All Stock' },
@@ -478,6 +479,20 @@ export default function AdminProducts() {
                   <div className="flex flex-wrap gap-2">
                     <CategoryBadge category={product.category} />
                     <StockBadge status={product.stock_status} />
+                    {(() => {
+                      const deal = getDealInfo(
+                        { dealPrice: product.deal_price, dealEndsAt: product.deal_ends_at },
+                        product.price
+                      );
+                      return deal.active ? (
+                        <span
+                          className="font-technical text-[10px] uppercase tracking-widest bg-[#ff5500] text-black px-2 py-0.5"
+                          title={formatDealRemaining(deal.remainingMs)}
+                        >
+                          Deal ৳{deal.dealPrice.toLocaleString('en-IN')}
+                        </span>
+                      ) : null;
+                    })()}
                   </div>
 
                   {/* Icons + swatches row */}

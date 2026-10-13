@@ -5,6 +5,8 @@ import { getProductBySlug, getRelatedProducts, resolveProductView } from '../dat
 import { useCartStore } from '../store/cartStore';
 import ReviewsSection from '../components/ReviewsSection';
 import { ADDED_TO_CART, pick } from '../lib/voice';
+import { useNow, withDeal } from '../lib/deals';
+import DealCountdown from '../components/DealCountdown';
 
 function formatStockStatus(status) {
   if (!status) return 'Made to Order';
@@ -38,6 +40,7 @@ export default function ProductModalPage() {
   const [selectedColor, setSelectedColor] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [cartMessage, setCartMessage] = useState('');
+  const now = useNow();
   const [addedToCart, setAddedToCart] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -239,14 +242,27 @@ export default function ProductModalPage() {
               </button>
             </div>
 
-            <div className="mt-6 flex items-end gap-3">
-              <p className="font-headline text-4xl text-[#ff5500]">
-                {resolvedProduct.price.toLocaleString('en-IN')} BDT
-              </p>
-              <p className="pb-1 font-technical text-[10px] uppercase tracking-[0.2em] text-stone-500">
-                per item
-              </p>
-            </div>
+            {(() => {
+              const priced = withDeal(resolvedProduct, now);
+              return (
+                <>
+                  <div className="mt-6 flex items-end gap-3 flex-wrap">
+                    <p className="font-headline text-4xl text-[#ff5500]">
+                      {priced.price.toLocaleString('en-IN')} BDT
+                    </p>
+                    {priced.dealActive && (
+                      <p className="pb-1 font-technical text-sm text-stone-500 line-through">
+                        {priced.regularPrice.toLocaleString('en-IN')} BDT
+                      </p>
+                    )}
+                    <p className="pb-1 font-technical text-[10px] uppercase tracking-[0.2em] text-stone-500">
+                      per item
+                    </p>
+                  </div>
+                  <DealCountdown product={priced} now={now} className="mt-2" />
+                </>
+              );
+            })()}
 
             <div className="mt-8 border border-white/10 bg-[#141414] p-5">
               <p className="font-technical text-[10px] uppercase tracking-[0.25em] text-stone-500">
@@ -449,7 +465,7 @@ export default function ProductModalPage() {
                     </h3>
                     <div className="mt-3 flex items-center justify-between gap-2">
                       <p className="font-headline text-xl text-[#ff5500]">
-                        {item.price.toLocaleString('en-IN')} BDT
+                        {withDeal(item, now).price.toLocaleString('en-IN')} BDT
                       </p>
                       <StockBadge status={item.stock_status} />
                     </div>

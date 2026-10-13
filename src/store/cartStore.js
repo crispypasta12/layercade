@@ -23,11 +23,19 @@ export const useCartStore = create(
         const lineKey = `${product.id}::${color?.id ?? ''}`;
         const existing = items.find((i) => getCartLineKey(i) === lineKey);
         const nextQuantity = Math.max(1, Number(quantity) || 1);
+        // `price` is the regular price; the deal fields let the cart work out
+        // the live price (see getCartLinePrice in src/lib/deals.js).
+        const pricing = {
+          price:        product.regularPrice ?? product.price,
+          regularPrice: product.regularPrice ?? product.price,
+          dealPrice:    product.dealPrice ?? null,
+          dealEndsAt:   product.dealEndsAt ?? null,
+        };
         if (existing) {
           set({
             items: items.map((i) =>
               getCartLineKey(i) === lineKey
-                ? { ...i, quantity: i.quantity + nextQuantity }
+                ? { ...i, ...pricing, quantity: i.quantity + nextQuantity }
                 : i
             ),
           });
@@ -39,7 +47,7 @@ export const useCartStore = create(
                 lineKey,
                 productId: product.id,
                 name: product.name,
-                price: product.price,
+                ...pricing,
                 quantity: nextQuantity,
                 image: product.images?.[0] ?? product.img1 ?? null,
                 slug: product.slug,
@@ -77,6 +85,16 @@ export const useCartStore = create(
       },
 
       clearCart: () => set({ items: [] }),
+
+      /** Replace pricing fields on lines, keyed by line key (used by checkout refresh). */
+      refreshPricing: (pricingByLineKey) => {
+        set({
+          items: get().items.map((i) => {
+            const pricing = pricingByLineKey[getCartLineKey(i)];
+            return pricing ? { ...normalizeCartItem(i), ...pricing } : normalizeCartItem(i);
+          }),
+        });
+      },
     }),
     {
       name: 'layercade-cart',

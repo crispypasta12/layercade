@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabase';
-import { useCartStore } from '../store/cartStore';
+import { getCartLineKey, useCartStore } from '../store/cartStore';
 import { CHECKOUT_PHONE_QUIP, CHECKOUT_NOTES_PLACEHOLDER } from '../lib/voice';
+import { getCartLinePrice, useNow } from '../lib/deals';
 
 const DHAKA_FEE = 60;
 const OUTSIDE_FEE = 120;
@@ -111,7 +112,56 @@ function Field({ label, required, error, hint, children }) {
 
 export default function Checkout() {
   const navigate = useNavigate();
-  const { items } = useCartStore();
+  const { items, refreshPricing } = useCartStore();
+  const now = useNow();
+  const [priceNotice, setPriceNotice] = useState(null);
+
+  /* Re-fetch current prices and deals once, so the total matches what
+     place_order() will charge even if a deal started or ended meanwhile. */
+  useEffect(() => {
+    const ids = [...new Set(items.map((i) => i.productId ?? i.id))];
+    if (!ids.length) return undefined;
+    let active = true;
+
+    supabase
+      .from('products')
+      .select('id, price, deal_price, deal_ends_at, product_colors(id, price, is_active)')
+      .in('id', ids)
+      .then(({ data, error }) => {
+        if (!active || error || !data) return;
+        const byId = new Map(data.map((p) => [String(p.id), p]));
+        const checkedAt = Date.now();
+        const updates = {};
+        const changed = [];
+
+        for (const item of items) {
+          const row = byId.get(String(item.productId ?? item.id));
+          if (!row) continue;
+          const color = item.colorId
+            ? row.product_colors?.find((c) => c.id === item.colorId && c.is_active)
+            : null;
+          const pricing = {
+            price:        Number(color?.price ?? row.price),
+            regularPrice: Number(color?.price ?? row.price),
+            dealPrice:    row.deal_price != null ? Number(row.deal_price) : null,
+            dealEndsAt:   row.deal_ends_at ?? null,
+          };
+          if (getCartLinePrice(item, checkedAt).price !== getCartLinePrice(pricing, checkedAt).price) {
+            changed.push(item.name);
+          }
+          updates[getCartLineKey(item)] = pricing;
+        }
+
+        refreshPricing(updates);
+        if (changed.length) {
+          setPriceNotice(`Prices updated for ${changed.join(', ')}. A deal started or ended since you added ${changed.length === 1 ? 'it' : 'them'}.`);
+        }
+      });
+
+    return () => { active = false; };
+    // Run once on mount; refreshPricing updates `items` itself.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /* Redirect to home if cart is empty */
   useEffect(() => {
@@ -126,7 +176,7 @@ export default function Checkout() {
   const [loading,     setLoading]     = useState(false);
   const [submitError, setSubmitError] = useState(null);
 
-  const subtotal    = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  const subtotal    = items.reduce((sum, i) => sum + getCartLinePrice(i, now).price * i.quantity, 0);
   const deliveryFee = fulfillment === 'pickup' ? 0
     : form.district && form.district !== 'Dhaka' ? OUTSIDE_FEE : DHAKA_FEE;
   const grandTotal  = subtotal + deliveryFee;
@@ -180,7 +230,8 @@ export default function Checkout() {
       p_address:          fulfillment === 'delivery' ? form.address.trim() : null,
       p_area:             fulfillment === 'delivery' ? form.area.trim()    : null,
       p_district:         fulfillment === 'delivery' ? form.district        : null,
-      p_items:            items,
+      // Record the unit price actually charged; place_order() re-derives it anyway.
+      p_items:            items.map((i) => ({ ...i, price: getCartLinePrice(i).price })),
       p_total_amount:     grandTotal,
       p_delivery_fee:     deliveryFee,
       p_notes:            form.notes.trim() || null,
@@ -279,20 +330,32 @@ export default function Checkout() {
                   <p className="font-technical text-stone-500 text-xs mt-1">
                     Qty: {item.quantity}
                   </p>
-                  <p className="font-technical text-stone-600 text-xs mt-0.5">
-                    {item.price.toLocaleString('en-IN')}৳ each
+                  <p className="font-technical text-stone-600 text-xs mt-0.5 flex items-baseline gap-2">
+                    {getCartLinePrice(item, now).price.toLocaleString('en-IN')}৳ each
+                    {getCartLinePrice(item, now).dealActive && (
+                      <>
+                        <span className="line-through">{getCartLinePrice(item, now).regularPrice.toLocaleString('en-IN')}৳</span>
+                        <span className="text-[9px] uppercase tracking-widest bg-[#ff5500] text-black px-1.5">Deal</span>
+                      </>
+                    )}
                   </p>
                 </div>
 
                 {/* Line total */}
                 <div className="flex-shrink-0 text-right">
                   <span className="font-headline text-xl text-[#ff5500]">
-                    {(item.price * item.quantity).toLocaleString('en-IN')}৳
+                    {(getCartLinePrice(item, now).price * item.quantity).toLocaleString('en-IN')}৳
                   </span>
                 </div>
               </div>
             ))}
           </div>
+
+          {priceNotice && (
+            <p className="font-technical text-[10px] uppercase tracking-widest text-yellow-300 border border-yellow-700/60 bg-yellow-950/40 px-4 py-3">
+              {priceNotice}
+            </p>
+          )}
 
           {/* Price breakdown */}
           <div className="bg-[#161616] border border-white/5 p-6 space-y-3">

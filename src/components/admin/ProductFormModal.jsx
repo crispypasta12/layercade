@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { parseProductImages } from '../../lib/productImages';
 import { supabase } from '../../lib/supabase';
+import { formatDealRemaining, getDealInfo, useNow } from '../../lib/deals';
 import { useCategories } from '../../lib/useCategories';
 import { useFilamentPalette } from '../../lib/useFilamentPalette';
 
@@ -38,6 +39,21 @@ function validateSlug(slug) {
   }
   return null;
 }
+
+// <input type="datetime-local"> works in local time without a zone suffix.
+function toLocalInput(value) {
+  if (!value) return '';
+  const d = new Date(value);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+const DEAL_SHORTCUTS = [
+  { label: '+6h',     hours: 6 },
+  { label: '+24h',    hours: 24 },
+  { label: '+3 days', hours: 72 },
+  { label: '+7 days', hours: 168 },
+];
 
 function Field({ label, error, children }) {
   return (
@@ -285,6 +301,9 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
   const [description, setDescription] = useState(product?.description ?? '');
   const [price, setPrice] = useState(product?.price != null ? String(product.price) : '');
   const [costPrice, setCostPrice] = useState(product?.cost_price != null ? String(product.cost_price) : '');
+  const [dealPrice, setDealPrice] = useState(product?.deal_price != null ? String(product.deal_price) : '');
+  const [dealEndsAt, setDealEndsAt] = useState(toLocalInput(product?.deal_ends_at));
+  const now = useNow();
   const [category, setCategory] = useState(product?.category ?? '');
   const [stockStatus, setStockStatus] = useState(product?.stock_status ?? 'in_stock');
   const [material, setMaterial] = useState(product?.material ?? '');
@@ -534,6 +553,15 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
     const slugErr = validateSlug(slug);
     if (slugErr) errors.slug = slugErr;
     if (!price || isNaN(Number(price)) || Number(price) < 0) errors.price = 'Enter a valid price.';
+    if (dealPrice !== '' || dealEndsAt !== '') {
+      if (dealPrice === '' || isNaN(Number(dealPrice)) || Number(dealPrice) < 0) {
+        errors.deal = 'Enter a valid deal price, or clear the deal.';
+      } else if (Number(dealPrice) >= Number(price)) {
+        errors.deal = 'Deal price must be lower than the selling price.';
+      } else if (!dealEndsAt) {
+        errors.deal = 'Pick when the deal ends.';
+      }
+    }
     if (imageUrls.length === 0) errors.image = 'Upload at least one image first.';
     if (imageUrls.length > MAX_IMAGE_COUNT) {
       errors.image = `You can upload up to ${MAX_IMAGE_COUNT} images per product.`;
@@ -563,6 +591,8 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
       description: description.trim(),
       price: Number(price),
       cost_price: costPrice !== '' && !isNaN(Number(costPrice)) ? Number(costPrice) : null,
+      deal_price: dealPrice !== '' ? Number(dealPrice) : null,
+      deal_ends_at: dealEndsAt ? new Date(dealEndsAt).toISOString() : null,
       category,
       image: imageUrls[0] ?? '',
       images: imageUrls,
@@ -792,6 +822,88 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
                 </p>
               )}
             </Field>
+          </div>
+
+          {/* Time-limited deal */}
+          <div className="border border-[#ff5500]/20 bg-[#ff5500]/5 p-4 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-technical text-[10px] text-[#ff5500] uppercase tracking-widest">Deal (optional)</p>
+              {(() => {
+                if (!dealPrice && !dealEndsAt) {
+                  return <span className="font-technical text-[10px] text-stone-600 uppercase">Not set</span>;
+                }
+                const deal = getDealInfo(
+                  { dealPrice: dealPrice === '' ? null : Number(dealPrice), dealEndsAt: dealEndsAt ? new Date(dealEndsAt) : null },
+                  Number(price),
+                  now
+                );
+                return deal.active ? (
+                  <span className="font-technical text-[10px] text-green-400 uppercase">
+                    Active · {formatDealRemaining(deal.remainingMs)}
+                  </span>
+                ) : (
+                  <span className="font-technical text-[10px] text-stone-500 uppercase">
+                    {dealEndsAt && new Date(dealEndsAt).getTime() <= now ? 'Expired' : 'Inactive'}
+                  </span>
+                );
+              })()}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Deal Price (BDT)">
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-stone-400 text-sm select-none">BDT</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={dealPrice}
+                    onChange={(e) => setDealPrice(e.target.value)}
+                    placeholder="e.g. 450"
+                    disabled={isFormLocked}
+                    className={inputClass + ' pl-12'}
+                  />
+                </div>
+              </Field>
+
+              <Field label="Deal Ends">
+                <input
+                  type="datetime-local"
+                  value={dealEndsAt}
+                  onChange={(e) => setDealEndsAt(e.target.value)}
+                  disabled={isFormLocked}
+                  className={inputClass + ' [color-scheme:dark]'}
+                />
+              </Field>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {DEAL_SHORTCUTS.map(({ label, hours }) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => setDealEndsAt(toLocalInput(Date.now() + hours * 3600 * 1000))}
+                  disabled={isFormLocked}
+                  className="font-technical text-[10px] uppercase tracking-widest border border-white/10 px-3 py-1.5 text-stone-300 hover:border-[#ff5500] hover:text-[#ff5500] transition-colors disabled:opacity-50"
+                >
+                  {label}
+                </button>
+              ))}
+              {(dealPrice || dealEndsAt) && (
+                <button
+                  type="button"
+                  onClick={() => { setDealPrice(''); setDealEndsAt(''); }}
+                  disabled={isFormLocked}
+                  className="font-technical text-[10px] uppercase tracking-widest px-3 py-1.5 text-red-400 hover:text-red-300 transition-colors disabled:opacity-50"
+                >
+                  Clear deal
+                </button>
+              )}
+            </div>
+            <p className="font-technical text-[9px] text-stone-600">
+              Shortcuts count from now. The deal price applies to every colour, and the deal ends on its own.
+            </p>
+            {fieldErrors.deal && <p className="font-technical text-[10px] text-red-400">{fieldErrors.deal}</p>}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

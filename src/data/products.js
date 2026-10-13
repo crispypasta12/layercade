@@ -7,7 +7,7 @@ import { parseProductImages } from '../lib/productImages';
 import { supabase } from '../lib/supabase';
 
 const PRODUCT_CARD_COLUMNS =
-  'id, name, slug, description, price, category, image, images, featured, new_arrival, stock_status, sort_order, has_color_variants, material';
+  'id, name, slug, description, price, category, image, images, featured, new_arrival, stock_status, sort_order, has_color_variants, material, deal_price, deal_ends_at';
 
 const PRODUCT_COLORS_COLUMNS =
   'id, color_id, name, hex, image, images, price, stock_status, sort_order, is_active';
@@ -51,7 +51,10 @@ function toProduct(row) {
     sort_order:        row.sort_order,
     has_color_variants: row.has_color_variants ?? false,
     colorVariants,
-    // Legacy compat: components check product.sale for strike-through price
+    // Time-limited deal (see src/lib/deals.js). `sale` / `originalPrice`
+    // are filled in by withDeal() at render time so expiry is live.
+    dealPrice:    row.deal_price != null ? Number(row.deal_price) : null,
+    dealEndsAt:   row.deal_ends_at ?? null,
     sale:         false,
     originalPrice: null,
     // Kept for ProductModalPage

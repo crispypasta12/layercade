@@ -1,7 +1,5 @@
 import { WHATSAPP_TOOLTIP } from '../lib/voice';
-
-const WA_NUMBER = '8801620869115';
-const WA_MESSAGE = encodeURIComponent("Hi, I'm interested in ordering from Layercade!");
+import { whatsappUrl } from '../lib/contact';
 
 export default function WhatsAppButton() {
   return (
@@ -21,7 +19,7 @@ export default function WhatsAppButton() {
 
       {/* Button */}
       <a
-        href={`https://wa.me/${WA_NUMBER}?text=${WA_MESSAGE}`}
+        href={whatsappUrl("Hi, I'm interested in ordering from Layercade!")}
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Order via WhatsApp"

@@ -1,12 +1,29 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FOOTER_TAGLINE, FOOTER_STATS, COPYRIGHT_QUIP } from '../lib/voice';
+import { CONTACT_EMAIL, ADDRESS_LINES } from '../lib/contact';
 
 const STATS_SHOWN = 4;
 
 export default function Footer() {
   // Rotate which "system stats" are visible on each hover
   const [statOffset, setStatOffset] = useState(0);
+  const [shareLabel, setShareLabel] = useState('Share Layercade');
+
+  const handleShare = async () => {
+    const data = { title: 'Layercade', url: 'https://www.layercade.com' };
+    try {
+      if (navigator.share) {
+        await navigator.share(data);
+        return;
+      }
+      await navigator.clipboard.writeText(data.url);
+      setShareLabel('Link copied');
+      setTimeout(() => setShareLabel('Share Layercade'), 2000);
+    } catch {
+      // User cancelled the share sheet or clipboard is unavailable
+    }
+  };
   const stats = Array.from(
     { length: STATS_SHOWN },
     (_, i) => FOOTER_STATS[(statOffset + i) % FOOTER_STATS.length]
@@ -27,12 +44,23 @@ export default function Footer() {
             {FOOTER_TAGLINE}
           </p>
           <div className="flex gap-4">
-            <span className="material-symbols-outlined text-[#ff5500] hover:scale-110 transition-transform cursor-pointer select-none">
+            <a
+              href={`mailto:${CONTACT_EMAIL}`}
+              aria-label={`Email ${CONTACT_EMAIL}`}
+              title={CONTACT_EMAIL}
+              className="material-symbols-outlined text-[#ff5500] hover:scale-110 transition-transform select-none"
+            >
               mail
-            </span>
-            <span className="material-symbols-outlined text-[#ff5500] hover:scale-110 transition-transform cursor-pointer select-none">
-              share
-            </span>
+            </a>
+            <button
+              type="button"
+              onClick={handleShare}
+              aria-label={shareLabel}
+              title={shareLabel}
+              className="material-symbols-outlined text-[#ff5500] hover:scale-110 transition-transform select-none"
+            >
+              {shareLabel === 'Link copied' ? 'check' : 'share'}
+            </button>
           </div>
         </div>
 
@@ -83,9 +111,12 @@ export default function Footer() {
         <div className="flex flex-col gap-3">
           <h5 className="font-headline text-white text-xl tracking-wider mb-2">Contact</h5>
           <div className="font-technical text-xs text-stone-500 leading-loose">
-            LAYER_HEADQUARTERS<br />
-            INDUSTRIAL ZONE 7<br />
-            DHAKA, BANGLADESH
+            {ADDRESS_LINES.map((line) => (
+              <span key={line} className="block uppercase">{line}</span>
+            ))}
+            <a href={`mailto:${CONTACT_EMAIL}`} className="block hover:text-[#ff5500] transition-colors">
+              {CONTACT_EMAIL}
+            </a>
           </div>
           <Link
             to="/quote"
@@ -104,8 +135,8 @@ export default function Footer() {
           © {new Date().getFullYear()} Layercade. {COPYRIGHT_QUIP}
         </span>
         <div className="flex gap-8 font-technical text-[10px] text-stone-600">
-          <span className="hover:text-[#ff5500] cursor-pointer transition-colors">Privacy_Policy</span>
-          <span className="hover:text-[#ff5500] cursor-pointer transition-colors">Terms_Of_Service</span>
+          <Link to="/privacy" className="hover:text-[#ff5500] transition-colors">Privacy_Policy</Link>
+          <Link to="/terms" className="hover:text-[#ff5500] transition-colors">Terms_Of_Service</Link>
         </div>
       </div>
     </footer>

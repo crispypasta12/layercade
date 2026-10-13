@@ -19,6 +19,7 @@ const ShopPage = lazy(() => import('./pages/ShopPage'));
 const Checkout = lazy(() => import('./pages/Checkout'));
 const OrderConfirmation = lazy(() => import('./pages/OrderConfirmation'));
 const NotFound = lazy(() => import('./pages/NotFound'));
+const Legal = lazy(() => import('./pages/Legal'));
 const AdminLogin = lazy(() => import('./pages/admin/Login'));
 const AdminDashboard = lazy(() => import('./pages/admin/Dashboard'));
 const AdminOrders = lazy(() => import('./pages/admin/Orders'));
@@ -66,6 +67,8 @@ function Layout() {
           <Route path="/shop/:categorySlug" element={<ShopPage />} />
           <Route path="/checkout"            element={<Checkout />} />
           <Route path="/order-confirmation" element={<OrderConfirmation />} />
+          <Route path="/privacy"            element={<Legal page="privacy" />} />
+          <Route path="/terms"              element={<Legal page="terms" />} />
           <Route path="*"                   element={<NotFound />} />
         </Routes>
         <AnimatePresence>

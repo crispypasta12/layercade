@@ -3,6 +3,7 @@ import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useCartStore } from '../store/cartStore';
 import { ORDER_PLACED, pick } from '../lib/voice';
+import { whatsappUrl as buildWhatsappUrl } from '../lib/contact';
 
 export default function OrderConfirmation() {
   const location  = useLocation();
@@ -29,11 +30,7 @@ export default function OrderConfirmation() {
   /* Don't render anything while redirecting */
   if (!orderId) return null;
 
-  const whatsappNumber = import.meta.env.VITE_WHATSAPP_NUMBER;
-  const whatsappMsg    = encodeURIComponent(
-    `Hi! I just placed order #ORD-${orderId} on Layercade.`
-  );
-  const whatsappUrl    = `https://wa.me/${whatsappNumber}?text=${whatsappMsg}`;
+  const whatsappUrl = buildWhatsappUrl(`Hi! I just placed order #ORD-${orderId} on Layercade.`);
 
   return (
     <main className="pt-44 pb-20 px-8 min-h-screen flex items-start justify-center">

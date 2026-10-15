@@ -136,6 +136,8 @@ export default function AdminDashboard() {
   const [orders,        setOrders]        = useState([]);
   const [lowStock,      setLowStock]      = useState([]);
   const [expenses,      setExpenses]      = useState([]);
+  const [ideas,         setIdeas]         = useState([]);
+  const [ideaVotes,     setIdeaVotes]     = useState([]);
   const [loading,       setLoading]       = useState(true);
   const [summaryPeriod, setSummaryPeriod] = useState('month');
 
@@ -153,7 +155,15 @@ export default function AdminDashboard() {
       supabase
         .from('expenses')
         .select('id, amount, date, category, title'),
-    ]).then(([ordersRes, productsRes, expensesRes]) => {
+      supabase
+        .from('ideas')
+        .select('id, title, status, created_at, image_url'),
+      supabase
+        .from('idea_votes')
+        .select('idea_id'),
+    ]).then(([ordersRes, productsRes, expensesRes, ideasRes, votesRes]) => {
+      setIdeas(ideasRes.data ?? []);
+      setIdeaVotes(votesRes.data ?? []);
       setOrders(ordersRes.data ?? []);
       setLowStock(productsRes.data ?? []);
       setExpenses(expensesRes.data ?? []);
@@ -162,6 +172,23 @@ export default function AdminDashboard() {
   }, []);
 
   /* ── Derived stats ──────────────────────────────────────────────── */
+  const ideaStats = (() => {
+    const weekAgo = daysAgo(7);
+    const counts = {};
+    for (const v of ideaVotes) counts[v.idea_id] = (counts[v.idea_id] ?? 0) + 1;
+    // Top-voted idea that hasn't been listed or archived yet.
+    const top = ideas
+      .filter((i) => !['listed', 'archived'].includes(i.status) && counts[i.id])
+      .sort((a, b) => counts[b.id] - counts[a.id])[0];
+    return {
+      newThisWeek: ideas.filter((i) => new Date(i.created_at) >= weekAgo).length,
+      inbox:       ideas.filter((i) => i.status === 'inbox').length,
+      testPrint:   ideas.filter((i) => i.status === 'test_print').length,
+      top,
+      topVotes:    top ? counts[top.id] : 0,
+    };
+  })();
+
   const activeOrders = orders.filter((o) => o.status !== 'cancelled');
 
   const revenue = {
@@ -535,6 +562,57 @@ export default function AdminDashboard() {
 
           {/* ── Sidebar ────────────────────────────────────────────── */}
           <div className="space-y-6">
+
+            {/* Ideas board */}
+            <div>
+              <p className="font-technical text-[10px] text-stone-500 uppercase tracking-widest mb-3">
+                Print Ideas
+              </p>
+              <Link
+                to="/admin/ideas"
+                className="block bg-[#111111] border border-white/10 hover:border-white/20 transition-colors group"
+              >
+                <div className="grid grid-cols-3 divide-x divide-white/5">
+                  {[
+                    { label: 'New this week', value: ideaStats.newThisWeek },
+                    { label: 'In inbox',      value: ideaStats.inbox },
+                    { label: 'Test print',    value: ideaStats.testPrint },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="px-3 py-4 text-center">
+                      <p className="text-white" style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.6rem', lineHeight: 1 }}>
+                        {loading ? '—' : value}
+                      </p>
+                      <p className="font-technical text-[9px] text-stone-500 uppercase tracking-widest mt-1">{label}</p>
+                    </div>
+                  ))}
+                </div>
+                {ideaStats.top && (
+                  <div className="flex items-center gap-3 px-4 py-3 border-t border-white/5">
+                    <div className="w-9 h-9 flex-shrink-0 bg-stone-900 border border-white/10 overflow-hidden">
+                      {ideaStats.top.image_url ? (
+                        <img src={ideaStats.top.image_url} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <span className="material-symbols-outlined text-stone-700" style={{ fontSize: 14 }}>lightbulb</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-technical text-[9px] text-[#ff5500] uppercase tracking-widest">Team favourite</p>
+                      <p className="font-body text-white text-sm truncate">{ideaStats.top.title}</p>
+                    </div>
+                    <span className="font-technical text-[10px] text-stone-400 flex items-center gap-1 flex-shrink-0">
+                      <span className="material-symbols-outlined" style={{ fontSize: 13 }}>thumb_up</span>
+                      {ideaStats.topVotes}
+                    </span>
+                  </div>
+                )}
+                <div className="px-4 py-3 border-t border-white/5 font-technical text-[10px] uppercase tracking-widest text-stone-500 group-hover:text-[#ff5500] transition-colors flex items-center gap-1">
+                  Open Ideas Board
+                  <span className="material-symbols-outlined" style={{ fontSize: 12 }}>arrow_forward</span>
+                </div>
+              </Link>
+            </div>
 
             {/* Low stock alert */}
             <div>

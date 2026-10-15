@@ -289,16 +289,19 @@ function VariantRow({
   );
 }
 
-export default function ProductFormModal({ product, onClose, onSuccess }) {
+// `prefill` seeds a new product (e.g. from an idea on the Ideas board); it is
+// ignored when editing. onSuccess also receives the saved product's id.
+export default function ProductFormModal({ product, prefill, onClose, onSuccess }) {
   const isEdit = product !== null;
   const initialImages = parseProductImages(product?.image, product?.images);
   const { parentCategories, subCategories } = useCategories();
   const { colors: globalColors } = useFilamentPalette();
 
   // Product fields
-  const [name, setName] = useState(product?.name ?? '');
-  const [slug, setSlug] = useState(product?.slug ?? '');
-  const [description, setDescription] = useState(product?.description ?? '');
+  const seed = isEdit ? null : prefill;
+  const [name, setName] = useState(product?.name ?? seed?.name ?? '');
+  const [slug, setSlug] = useState(product?.slug ?? (seed?.name ? generateSlug(seed.name) : ''));
+  const [description, setDescription] = useState(product?.description ?? seed?.description ?? '');
   const [price, setPrice] = useState(product?.price != null ? String(product.price) : '');
   const [costPrice, setCostPrice] = useState(product?.cost_price != null ? String(product.cost_price) : '');
   const [dealPrice, setDealPrice] = useState(product?.deal_price != null ? String(product.deal_price) : '');
@@ -686,7 +689,7 @@ export default function ProductFormModal({ product, onClose, onSuccess }) {
       }
     }
 
-    onSuccess(isEdit ? 'Product updated successfully.' : 'Product added successfully.');
+    onSuccess(isEdit ? 'Product updated successfully.' : 'Product added successfully.', savedProductId);
     setSaving(false);
     onClose();
   };

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import AdminNavbar from '../../components/admin/AdminNavbar';
 
 /* ─── Defaults ───────────────────────────────────────────────────── */
@@ -739,8 +740,14 @@ export default function CostCalculator() {
   const [materials,      setMaterials]      = useState(() => load('calc_materials', DEFAULT_MATERIALS));
   const [settings,       setSettings]       = useState(() => load('calc_settings',  DEFAULT_SETTINGS));
   const [presets,        setPresets]        = useState(() => load('calc_presets',   DEFAULT_PRESETS));
-  const [inputs,         setInputs]         = useState(DEFAULT_INPUTS);
-  const [selectedMats,   setSelectedMats]   = useState([{ materialId: 1, weight_g: 50 }]);
+  // Opened from an idea on the Ideas board: start from its print estimate.
+  const fromIdea = useLocation().state?.idea ?? null;
+  const [inputs,         setInputs]         = useState(() => (
+    fromIdea?.print_hours ? { ...DEFAULT_INPUTS, print_hours: Number(fromIdea.print_hours) } : DEFAULT_INPUTS
+  ));
+  const [selectedMats,   setSelectedMats]   = useState(() => [
+    { materialId: 1, weight_g: fromIdea?.filament_g ? Number(fromIdea.filament_g) : 50 },
+  ]);
   const [showSettings,   setShowSettings]   = useState(false);
   const [activeTab,      setActiveTab]      = useState('calculator'); // 'calculator' | 'library' | 'presets'
 
@@ -820,6 +827,24 @@ export default function CostCalculator() {
             Settings
           </button>
         </div>
+
+        {fromIdea && (
+          <div className="flex items-center justify-between gap-3 flex-wrap bg-[#ff5500]/5 border border-[#ff5500]/30 px-4 py-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="material-symbols-outlined text-[#ff5500]" style={{ fontSize: 16 }}>lightbulb</span>
+              <span className="font-technical text-[10px] text-stone-400 uppercase tracking-widest">Costing idea</span>
+              <span className="font-body text-sm text-white truncate">{fromIdea.title}</span>
+            </div>
+            <span className="font-technical text-[10px] text-stone-500 uppercase tracking-widest">
+              {fromIdea.print_hours || fromIdea.filament_g
+                ? 'Print time and filament pre-filled from the idea'
+                : 'No estimate on the idea yet, so these are defaults'}
+            </span>
+            <Link to="/admin/ideas" className="font-technical text-[10px] text-[#ff5500] uppercase tracking-widest hover:underline">
+              ← Back to Ideas
+            </Link>
+          </div>
+        )}
 
         {/* ── Settings panel (collapsible) ────────────────────────── */}
         {showSettings && (

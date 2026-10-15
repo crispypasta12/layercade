@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { AnimatePresence } from 'framer-motion';
 import AdminNavbar from '../../components/admin/AdminNavbar';
+import ProductFormModal from '../../components/admin/ProductFormModal';
 import { supabase } from '../../lib/supabase';
 import { useCurrentMember } from '../../contexts/CurrentMemberContext';
 import {
@@ -161,6 +164,11 @@ function IdeaCard({ idea, member, voters = [], myMemberId, membersById, onVote, 
         <div style={{ position: 'absolute', top: 8, left: 8 }}>
           <SourceBadge source={idea.source} />
         </div>
+        {idea.product_id && (
+          <span title="Listed as a product" style={{ position: 'absolute', top: 8, right: 8, display: 'flex', background: 'rgba(0,0,0,0.75)', border: '1px solid rgba(34,197,94,0.5)', color: '#22c55e', padding: 3 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 13 }}>storefront</span>
+          </span>
+        )}
       </div>
 
       <div style={{ padding: '10px 12px 12px' }}>
@@ -285,7 +293,7 @@ function IdeaColumn({ column, ideas, membersById, votesByIdea, myMemberId, onVot
 
 // ─── Idea Modal ───────────────────────────────────────────────
 
-function IdeaModal({ idea, membersById, allTags, onClose, onSave, onDelete }) {
+function IdeaModal({ idea, membersById, allTags, product, onClose, onSave, onDelete, onTurnIntoProduct, onEstimate }) {
   const isMobile = useIsMobile();
   const [form, setForm] = useState({
     title: idea.title || '',
@@ -295,6 +303,9 @@ function IdeaModal({ idea, membersById, allTags, onClose, onSave, onDelete }) {
     url: idea.url || '',
     image_url: idea.image_url || null,
     tags: idea.tags || [],
+    est_print_hours: idea.est_print_hours ?? '',
+    est_filament_g: idea.est_filament_g ?? '',
+    product_id: idea.product_id ?? null,
   });
   const [tagDraft, setTagDraft] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -342,15 +353,27 @@ function IdeaModal({ idea, membersById, allTags, onClose, onSave, onDelete }) {
     onClose();
   };
 
-  const save = () => {
-    if (!form.title.trim() || uploading) return;
+  const canSave = form.title.trim() && !uploading;
+
+  // The idea as it should be saved. Also used by the product and calculator
+  // actions, which save first so nothing typed in the popup is lost.
+  const collect = () => {
     const pendingTag = normaliseTag(tagDraft);
     const tags = pendingTag && !form.tags.includes(pendingTag) ? [...form.tags, pendingTag] : form.tags;
     // Keep only the screenshot that ended up on the idea.
     uploaded.current.filter(url => url !== form.image_url).forEach(url => removeIdeaImage(supabase, url));
     uploaded.current = [];
-    onSave({ ...idea, ...form, tags, title: form.title.trim(), url: extractUrl(form.url) || null });
+    const positive = v => (Number(v) > 0 ? Number(v) : null);
+    return {
+      ...idea, ...form, tags,
+      title: form.title.trim(),
+      url: extractUrl(form.url) || null,
+      est_print_hours: positive(form.est_print_hours),
+      est_filament_g: positive(form.est_filament_g) && Math.round(Number(form.est_filament_g)),
+    };
   };
+
+  const save = () => { if (canSave) onSave(collect()); };
 
   const suggestions = allTags.filter(t => !form.tags.includes(t));
 
@@ -447,6 +470,40 @@ function IdeaModal({ idea, membersById, allTags, onClose, onSave, onDelete }) {
                 Open on {(IDEA_SOURCES[idea.source] || IDEA_SOURCES.other).label}
               </a>
             )}
+
+            {/* Next steps: cost it, then list it */}
+            <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <button onClick={() => canSave && onEstimate(collect())} disabled={!canSave} style={actionButton}>
+                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>calculate</span>
+                Estimate cost
+              </button>
+              {form.product_id ? (
+                <div style={{ border: '1px solid rgba(34,197,94,0.3)', background: 'rgba(34,197,94,0.06)', padding: '8px 10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#22c55e', fontFamily: mono, fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>storefront</span>
+                    Listed as product
+                  </div>
+                  <div style={{ marginTop: 4, color: '#ccc', fontSize: 12 }}>{product?.name ?? 'Product'}</div>
+                  <div style={{ marginTop: 6, display: 'flex', gap: 10, fontFamily: mono, fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    {product?.slug && (
+                      <a href={`/${product.slug}`} target="_blank" rel="noopener noreferrer" style={{ color: '#22c55e', textDecoration: 'none' }}>View in shop ↗</a>
+                    )}
+                    <button onClick={() => set('product_id', null)} style={{ background: 'none', border: 'none', padding: 0, color: '#666', cursor: 'pointer', fontFamily: mono, fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                      Unlink
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => canSave && onTurnIntoProduct(collect())}
+                  disabled={!canSave}
+                  style={{ ...actionButton, background: 'rgba(255,85,0,0.1)', borderColor: 'rgba(255,85,0,0.45)', color: '#ff5500' }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>add_business</span>
+                  Turn into product
+                </button>
+              )}
+            </div>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -501,6 +558,16 @@ function IdeaModal({ idea, membersById, allTags, onClose, onSave, onDelete }) {
                 style={{ ...input, resize: 'vertical' }}
               />
             </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={fieldLabel}>Print time (hours)</label>
+                <input type="number" min="0" step="0.25" inputMode="decimal" value={form.est_print_hours} onChange={e => set('est_print_hours', e.target.value)} placeholder="e.g. 3.5" style={input} />
+              </div>
+              <div>
+                <label style={fieldLabel}>Filament (grams)</label>
+                <input type="number" min="0" step="1" inputMode="numeric" value={form.est_filament_g} onChange={e => set('est_filament_g', e.target.value)} placeholder="e.g. 120" style={input} />
+              </div>
+            </div>
             <div>
               <label style={fieldLabel}>Link</label>
               <input value={form.url} onChange={e => set('url', e.target.value)} placeholder="https://…" style={{ ...input, fontSize: 11 }} />
@@ -515,8 +582,8 @@ function IdeaModal({ idea, membersById, allTags, onClose, onSave, onDelete }) {
           </button>
           <button
             onClick={save}
-            disabled={!form.title.trim() || uploading}
-            style={{ background: '#ff5500', border: 'none', color: '#fff', padding: '8px 18px', cursor: form.title.trim() && !uploading ? 'pointer' : 'not-allowed', opacity: form.title.trim() && !uploading ? 1 : 0.4, fontFamily: mono, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}
+            disabled={!canSave}
+            style={{ background: '#ff5500', border: 'none', color: '#fff', padding: '8px 18px', cursor: canSave ? 'pointer' : 'not-allowed', opacity: canSave ? 1 : 0.4, fontFamily: mono, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}
           >
             Save
           </button>
@@ -525,6 +592,13 @@ function IdeaModal({ idea, membersById, allTags, onClose, onSave, onDelete }) {
     </div>
   );
 }
+
+const actionButton = {
+  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+  background: 'none', border: '1px solid rgba(255,255,255,0.08)', color: '#aaa',
+  padding: '8px 10px', cursor: 'pointer', fontFamily: mono, fontSize: 9,
+  textTransform: 'uppercase', letterSpacing: '0.08em',
+};
 
 const imageAction = {
   background: 'rgba(0,0,0,0.75)', border: '1px solid rgba(255,255,255,0.15)', color: '#ddd',
@@ -615,6 +689,9 @@ export default function Ideas() {
   const [activeCol, setActiveCol] = useState('inbox');
   const [toast,     setToast]     = useState(null);
   const [votes,     setVotes]     = useState([]);
+  const [products,  setProducts]  = useState([]);
+  const [productFor, setProductFor] = useState(null); // idea being turned into a product
+  const navigate = useNavigate();
   const [filterSource, setFilterSource] = useState('');
   const [filterTag,    setFilterTag]    = useState('');
   const [sortBy,       setSortBy]       = useState('manual');
@@ -634,7 +711,9 @@ export default function Ideas() {
       supabase.from('ideas').select('*').order('position').order('created_at', { ascending: false }),
       supabase.from('members').select('id, name, color'),
       supabase.from('idea_votes').select('idea_id, member_id'),
-    ]).then(([i, m, v]) => {
+      supabase.from('products').select('id, name, slug'),
+    ]).then(([i, m, v, p]) => {
+      setProducts(p.data || []);
       if (i.error) showToast(`Couldn't load ideas: ${i.error.message}`, 'error');
       setIdeas(i.data || []);
       setMembers(m.data || []);
@@ -644,6 +723,7 @@ export default function Ideas() {
   }, []);
 
   const membersById = useMemo(() => Object.fromEntries(members.map(m => [m.id, m])), [members]);
+  const productsById = useMemo(() => Object.fromEntries(products.map(p => [p.id, p])), [products]);
 
   const describeDuplicate = existing => {
     const who = membersById[existing.added_by]?.name.split(' ')[0];
@@ -772,13 +852,18 @@ export default function Ideas() {
   };
 
   // ── CRUD ──
-  const handleSave = async idea => {
+  // Returns the saved row, or null if it failed. keepOpen is for actions that
+  // save and then move on somewhere else.
+  const handleSave = async (idea, { keepOpen = false } = {}) => {
     const before = ideas.find(i => i.id === idea.id);
     const linkChanged = (idea.url || null) !== (before?.url || null);
     const { data, error } = await supabase.from('ideas').update({
       title: idea.title, notes: idea.notes || null, status: idea.status,
       author: idea.author || null, image_url: idea.image_url || null,
       tags: idea.tags,
+      est_print_hours: idea.est_print_hours ?? null,
+      est_filament_g: idea.est_filament_g ?? null,
+      product_id: idea.product_id ?? null,
       ...(linkChanged && {
         url: idea.url,
         url_key: idea.url ? normaliseUrl(idea.url) : null,
@@ -792,11 +877,39 @@ export default function Ideas() {
       } else {
         showToast(`Couldn't save: ${error.message}`, 'error');
       }
-      return;
+      return null;
     }
     if (before?.image_url && before.image_url !== data.image_url) removeIdeaImage(supabase, before.image_url);
     setIdeas(is => is.map(i => i.id === data.id ? data : i));
-    setModalIdea(null);
+    if (!keepOpen) setModalIdea(null);
+    return data;
+  };
+
+  // ── Next steps ──
+  const handleEstimate = async idea => {
+    const saved = await handleSave(idea, { keepOpen: true });
+    if (!saved) return;
+    navigate('/admin/calculator', {
+      state: { idea: { id: saved.id, title: saved.title, print_hours: saved.est_print_hours, filament_g: saved.est_filament_g } },
+    });
+  };
+
+  const handleTurnIntoProduct = async idea => {
+    const saved = await handleSave(idea);
+    if (saved) setProductFor(saved);
+  };
+
+  const handleProductCreated = async (message, productId) => {
+    const idea = productFor;
+    const { data: product } = await supabase.from('products').select('id, name, slug').eq('id', productId).single();
+    if (product) setProducts(ps => [...ps, product]);
+    const { data, error } = await supabase.from('ideas')
+      .update({ product_id: productId, status: 'listed' })
+      .eq('id', idea.id).select().single();
+    if (error) { showToast(`Product saved, but linking the idea failed: ${error.message}`, 'error'); return; }
+    setIdeas(is => is.map(i => i.id === data.id ? data : i));
+    setActiveCol('listed');
+    showToast(`${message} The idea moved to Listed.`);
   };
 
   const handleDelete = async id => {
@@ -1018,11 +1131,25 @@ export default function Ideas() {
           idea={modalIdea}
           membersById={membersById}
           allTags={allTags}
+          product={productsById[modalIdea.product_id]}
+          onTurnIntoProduct={handleTurnIntoProduct}
+          onEstimate={handleEstimate}
           onClose={() => setModalIdea(null)}
           onSave={handleSave}
           onDelete={handleDelete}
         />
       )}
+
+      <AnimatePresence>
+        {productFor && (
+          <ProductFormModal
+            product={null}
+            prefill={{ name: productFor.title, description: productFor.notes || '' }}
+            onClose={() => setProductFor(null)}
+            onSuccess={handleProductCreated}
+          />
+        )}
+      </AnimatePresence>
 
       {toast && (
         <div

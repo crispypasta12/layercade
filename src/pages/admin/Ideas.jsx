@@ -10,7 +10,9 @@ import { useCurrentMember } from '../../contexts/CurrentMemberContext';
 import {
   IDEA_STATUSES, IDEA_SOURCES, detectSource, normaliseUrl, extractUrl, titleFromUrl,
   firstImageFile, uploadIdeaImage, removeIdeaImage, normaliseTag,
+  DUE_SOON_DAYS, daysUntil, deadlineInfo, upcomingOccasions, salesByProduct,
 } from '../../lib/ideas';
+import { isCostStale, pricesChangedAt } from '../../lib/costing';
 
 const mono = "'Space Mono', monospace";
 
@@ -113,6 +115,24 @@ function VoteButton({ voters, myMemberId, membersById, onVote }) {
   );
 }
 
+const DEADLINE_COLORS = { urgent: '#ef4444', soon: '#f59e0b', later: '#999', done: '#22c55e', past: '#555' };
+
+function DeadlineChip({ info, compact }) {
+  const color = DEADLINE_COLORS[info.tone];
+  const text = !compact ? info.label
+    : info.tone === 'done' ? 'Ready' : info.tone === 'past' ? 'Passed' : `${info.days}d`;
+  return (
+    <span title={info.label} style={{
+      display: 'inline-flex', alignItems: 'center', gap: 3,
+      background: 'rgba(0,0,0,0.8)', color, border: `1px solid ${color}60`,
+      fontSize: 9, padding: '2px 6px', fontFamily: mono, letterSpacing: '0.04em', whiteSpace: 'nowrap',
+    }}>
+      <span className="material-symbols-outlined" style={{ fontSize: 11 }}>{info.tone === 'done' ? 'event_available' : 'event'}</span>
+      {text}
+    </span>
+  );
+}
+
 // ─── Card sizes ───────────────────────────────────────────────
 // column: desktop column width. tile: minimum card width in the phone grid
 // (≈3 / 2 / 1 across on a phone). The rest is how much each card shows.
@@ -170,7 +190,7 @@ function CardSizeSwitch({ size, onChange, leading = false }) {
 
 // ─── Idea Card ────────────────────────────────────────────────
 
-function IdeaCard({ idea, size = CARD_SIZES.m, member, voters = [], myMemberId, membersById, onVote, onClick, onDragStart, isDragTarget, onCardDragOver, onCardDrop }) {
+function IdeaCard({ idea, size = CARD_SIZES.m, member, voters = [], myMemberId, membersById, sale, costStale, today, onVote, onClick, onDragStart, isDragTarget, onCardDragOver, onCardDrop }) {
   if (idea.pending) {
     return (
       <div style={{ background: '#161616', border: '1px dashed rgba(255,85,0,0.35)', padding: 12 }}>
@@ -182,6 +202,8 @@ function IdeaCard({ idea, size = CARD_SIZES.m, member, voters = [], myMemberId, 
       </div>
     );
   }
+
+  const deadline = deadlineInfo(idea, today);
 
   return (
     <div
@@ -230,6 +252,11 @@ function IdeaCard({ idea, size = CARD_SIZES.m, member, voters = [], myMemberId, 
             <span className="material-symbols-outlined" style={{ fontSize: 13 }}>storefront</span>
           </span>
         )}
+        {deadline && (
+          <div style={{ position: 'absolute', bottom: 8, left: 8, right: 8 }}>
+            <DeadlineChip info={deadline} compact={!size.showMeta} />
+          </div>
+        )}
       </div>
 
       <div style={{ padding: size.pad }}>
@@ -248,10 +275,23 @@ function IdeaCard({ idea, size = CARD_SIZES.m, member, voters = [], myMemberId, 
           </div>
         )}
         {idea.est_cost != null && (
-          <div title={`Cost ${taka(idea.est_cost)} per piece${idea.est_price != null ? ` · sells for ${taka(idea.est_price)}` : ''}`} style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: 6, rowGap: 2, fontFamily: mono, fontSize: 10, color: '#888' }}>
-            {size.showMeta && <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#555' }}>calculate</span>}
+          <div
+            title={`Cost ${taka(idea.est_cost)} per piece${idea.est_price != null ? ` · sells for ${taka(idea.est_price)}` : ''}${costStale ? ` · costed ${timeAgo(idea.costed_at)}, filament prices or calculator settings have changed since` : ''}`}
+            style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: 6, rowGap: 2, fontFamily: mono, fontSize: 10, color: costStale ? '#f59e0b' : '#888' }}
+          >
+            {(size.showMeta || costStale) && <span className="material-symbols-outlined" style={{ fontSize: 13, color: costStale ? '#f59e0b' : '#555' }}>{costStale ? 'update' : 'calculate'}</span>}
             <span style={{ whiteSpace: 'nowrap' }}>{taka(idea.est_cost)}{size.showMeta && ' cost'}</span>
-            {idea.est_price != null && <span style={{ color: '#22c55e', whiteSpace: 'nowrap' }}>→ {taka(idea.est_price)}</span>}
+            {idea.est_price != null && <span style={{ color: costStale ? '#f59e0b' : '#22c55e', whiteSpace: 'nowrap' }}>→ {taka(idea.est_price)}</span>}
+          </div>
+        )}
+        {idea.product_id && (sale || size.showMeta) && (
+          <div
+            title={sale ? `${sale.units} sold in ${sale.orders} order${sale.orders === 1 ? '' : 's'} · ${taka(sale.revenue)} revenue · last order ${timeAgo(sale.lastAt)}` : 'Listed, no orders yet'}
+            style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: 6, rowGap: 2, fontFamily: mono, fontSize: 10, color: sale ? '#22c55e' : '#555' }}
+          >
+            {size.showMeta && <span className="material-symbols-outlined" style={{ fontSize: 13 }}>{sale ? 'trending_up' : 'hourglass_empty'}</span>}
+            <span style={{ whiteSpace: 'nowrap' }}>{sale ? `${sale.units} sold` : 'No sales yet'}</span>
+            {sale && size.showMeta && <span style={{ color: '#888', whiteSpace: 'nowrap' }}>· {taka(sale.revenue)}</span>}
           </div>
         )}
         <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -282,7 +322,7 @@ function IdeaCard({ idea, size = CARD_SIZES.m, member, voters = [], myMemberId, 
 
 // ─── Column ───────────────────────────────────────────────────
 
-function IdeaColumn({ column, ideas, size = CARD_SIZES.m, membersById, votesByIdea, myMemberId, onVote, onCardClick, onDragStart, onDrop, fullWidth }) {
+function IdeaColumn({ column, ideas, size = CARD_SIZES.m, membersById, votesByIdea, myMemberId, sales, costsChangedAt, today, onVote, onCardClick, onDragStart, onDrop, fullWidth }) {
   const [dragOver, setDragOver] = useState(false);
   const [dragOverCardId, setDragOverCardId] = useState(null);
 
@@ -333,6 +373,9 @@ function IdeaColumn({ column, ideas, size = CARD_SIZES.m, membersById, votesById
             voters={votesByIdea[idea.id]}
             myMemberId={myMemberId}
             membersById={membersById}
+            sale={idea.product_id ? sales[String(idea.product_id)] : null}
+            costStale={isCostStale(idea, costsChangedAt)}
+            today={today}
             onVote={onVote}
             onClick={onCardClick}
             onDragStart={onDragStart}
@@ -362,7 +405,7 @@ function IdeaColumn({ column, ideas, size = CARD_SIZES.m, membersById, votesById
 
 // ─── Idea Modal ───────────────────────────────────────────────
 
-function IdeaModal({ idea, membersById, allTags, product, onClose, onSave, onDelete, onTurnIntoProduct, onEstimate }) {
+function IdeaModal({ idea, membersById, allTags, product, sale, costStale, today, onClose, onSave, onDelete, onTurnIntoProduct, onEstimate }) {
   const isMobile = useIsMobile();
   const [form, setForm] = useState({
     title: idea.title || '',
@@ -377,7 +420,10 @@ function IdeaModal({ idea, membersById, allTags, product, onClose, onSave, onDel
     est_cost: idea.est_cost ?? '',
     est_price: idea.est_price ?? '',
     product_id: idea.product_id ?? null,
+    needed_by: idea.needed_by || '',
+    occasion: idea.occasion || '',
   });
+  const [occasions] = useState(() => upcomingOccasions(today).slice(0, 6));
   const [tagDraft, setTagDraft] = useState('');
   const [uploading, setUploading] = useState(false);
   const [imageError, setImageError] = useState(null);
@@ -444,12 +490,16 @@ function IdeaModal({ idea, membersById, allTags, product, onClose, onSave, onDel
       est_filament_g: positive(form.est_filament_g) && Math.round(Number(form.est_filament_g)),
       est_cost: money(form.est_cost),
       est_price: money(form.est_price),
+      needed_by: form.needed_by || null,
+      occasion: form.occasion.trim() || null,
     };
   };
 
   const save = () => { if (canSave) onSave(collect()); };
 
   const suggestions = allTags.filter(t => !form.tags.includes(t));
+  const deadline = deadlineInfo({ ...form, status: form.status }, today);
+  const costPer = product?.cost_price ?? idea.est_cost;
 
   return (
     <div
@@ -547,8 +597,12 @@ function IdeaModal({ idea, membersById, allTags, product, onClose, onSave, onDel
 
             {/* Next steps: cost it, then list it */}
             <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <button onClick={() => canSave && onEstimate(collect())} disabled={!canSave} style={actionButton}>
-                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>calculate</span>
+              <button
+                onClick={() => canSave && onEstimate(collect())}
+                disabled={!canSave}
+                style={costStale ? { ...actionButton, color: '#f59e0b', borderColor: 'rgba(245,158,11,0.45)', background: 'rgba(245,158,11,0.08)' } : actionButton}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{costStale ? 'update' : 'calculate'}</span>
                 {idea.est_cost != null ? 'Recalculate cost' : 'Estimate cost'}
               </button>
               {form.product_id ? (
@@ -558,6 +612,22 @@ function IdeaModal({ idea, membersById, allTags, product, onClose, onSave, onDel
                     Listed as product
                   </div>
                   <div style={{ marginTop: 4, color: '#ccc', fontSize: 12 }}>{product?.name ?? 'Product'}</div>
+                  {form.product_id === idea.product_id && (
+                    <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid rgba(34,197,94,0.15)', fontFamily: mono, fontSize: 10, lineHeight: 1.7, color: '#aaa' }}>
+                      {sale ? (
+                        <>
+                          <div><b style={{ color: '#fff', fontWeight: 700 }}>{sale.units}</b> sold in {sale.orders} order{sale.orders === 1 ? '' : 's'}</div>
+                          <div>
+                            {taka(sale.revenue)} revenue
+                            {costPer != null && <span style={{ color: '#22c55e' }}> · ~{taka(Math.round(sale.revenue - sale.units * Number(costPer)))} profit</span>}
+                          </div>
+                          <div style={{ color: '#666' }}>Last order {timeAgo(sale.lastAt)}{product?.created_at && ` · listed ${timeAgo(product.created_at)}`}</div>
+                        </>
+                      ) : (
+                        <div style={{ color: '#666' }}>No orders yet{product?.created_at && ` · listed ${timeAgo(product.created_at)}`}</div>
+                      )}
+                    </div>
+                  )}
                   <div style={{ marginTop: 6, display: 'flex', gap: 10, fontFamily: mono, fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                     {product?.slug && (
                       <a href={`/${product.slug}`} target="_blank" rel="noopener noreferrer" style={{ color: '#22c55e', textDecoration: 'none' }}>View in shop ↗</a>
@@ -623,6 +693,42 @@ function IdeaModal({ idea, membersById, allTags, product, onClose, onSave, onDel
               </div>
             </div>
             <div>
+              <label style={fieldLabel}>
+                Needed by
+                {deadline && <span style={{ marginLeft: 8, color: DEADLINE_COLORS[deadline.tone], textTransform: 'none', letterSpacing: 0 }}>{deadline.label}</span>}
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <input type="date" value={form.needed_by} onChange={e => set('needed_by', e.target.value)} style={{ ...input, colorScheme: 'dark' }} />
+                <input value={form.occasion} maxLength={60} onChange={e => set('occasion', e.target.value)} placeholder="Occasion (Eid, launch…)" style={input} />
+              </div>
+              <div style={{ marginTop: 6, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                {occasions.map(o => {
+                  const picked = form.needed_by === o.date && form.occasion === o.label;
+                  return (
+                    <button
+                      key={o.label}
+                      type="button"
+                      onClick={() => setForm(f => picked ? { ...f, needed_by: '', occasion: '' } : { ...f, needed_by: o.date, occasion: o.label })}
+                      title={o.estimated ? 'Estimated date: adjust it once the moon is sighted' : undefined}
+                      style={{
+                        background: picked ? 'rgba(255,85,0,0.12)' : 'none',
+                        border: `1px solid ${picked ? 'rgba(255,85,0,0.45)' : 'rgba(255,255,255,0.08)'}`,
+                        color: picked ? '#ff5500' : '#777', cursor: 'pointer', padding: '3px 7px',
+                        fontFamily: mono, fontSize: 9, letterSpacing: '0.03em',
+                      }}
+                    >
+                      {o.label} · {new Date(`${o.date}T00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}{o.estimated && '*'}
+                    </button>
+                  );
+                })}
+                {(form.needed_by || form.occasion) && (
+                  <button type="button" onClick={() => setForm(f => ({ ...f, needed_by: '', occasion: '' }))} style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontFamily: mono, fontSize: 9, padding: '3px 4px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+            <div>
               <label style={fieldLabel}>Notes</label>
               <textarea
                 value={form.notes}
@@ -654,7 +760,12 @@ function IdeaModal({ idea, membersById, allTags, product, onClose, onSave, onDel
                 </div>
               </div>
               <div style={{ marginTop: 6, fontFamily: mono, fontSize: 9, color: '#555', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {idea.costed_at
+                {idea.costed_at && costStale
+                  ? <span style={{ color: '#f59e0b' }}>
+                      Costed {timeAgo(idea.costed_at)}. Filament prices or calculator settings have changed since,{' '}
+                      <button onClick={() => canSave && onEstimate(collect())} style={{ background: 'none', border: 'none', padding: 0, color: '#f59e0b', textDecoration: 'underline', cursor: 'pointer', fontFamily: mono, fontSize: 9 }}>recalculate</button>.
+                    </span>
+                  : idea.costed_at
                   ? <>From the calculator {timeAgo(idea.costed_at)}{Number(form.est_cost) > 0 && Number(form.est_price) > 0 && (
                       <span style={{ color: '#22c55e' }}>· {Math.round((1 - Number(form.est_cost) / Number(form.est_price)) * 100)}% margin</span>
                     )}</>
@@ -808,6 +919,10 @@ export default function Ideas() {
   const [sortBy,       setSortBy]       = useState('manual');
   const [cardSize,     setCardSize]     = useCardSize();
   const [weekAgo] = useState(() => new Date(Date.now() - 7 * 86400000));
+  const [today] = useState(() => new Date());
+  const [costsChangedAt] = useState(pricesChangedAt);
+  const [orders,       setOrders]       = useState([]);
+  const [dueSoon,      setDueSoon]      = useState(false);
   const dragId = useRef(null);
   const toastTimer = useRef(null);
 
@@ -827,10 +942,13 @@ export default function Ideas() {
       supabase.from('ideas').select('*').order('position').order('created_at', { ascending: false }),
       supabase.from('members').select('id, name, color'),
       supabase.from('idea_votes').select('idea_id, member_id'),
-      supabase.from('products').select('id, name, slug'),
-    ]).then(([i, m, v, p]) => {
+      supabase.from('products').select('id, name, slug, price, cost_price, created_at'),
+      // For sales of listed ideas; cancelled and returned orders don't count.
+      supabase.from('orders').select('created_at, items').not('status', 'in', '(cancelled,returned)'),
+    ]).then(([i, m, v, p, o]) => {
       if (stale) return;
       setProducts(p.data || []);
+      setOrders(o.data || []);
       if (i.error) showToast(`Couldn't load ideas: ${i.error.message}`, 'error');
       setIdeas(i.data || []);
       setMembers(m.data || []);
@@ -842,6 +960,7 @@ export default function Ideas() {
 
   const membersById = useMemo(() => Object.fromEntries(members.map(m => [m.id, m])), [members]);
   const productsById = useMemo(() => Object.fromEntries(products.map(p => [p.id, p])), [products]);
+  const sales = useMemo(() => salesByProduct(orders, products), [orders, products]);
 
   const describeDuplicate = existing => {
     const who = membersById[existing.added_by]?.name.split(' ')[0];
@@ -1013,6 +1132,8 @@ export default function Ideas() {
       est_cost: idea.est_cost ?? null,
       est_price: idea.est_price ?? null,
       product_id: idea.product_id ?? null,
+      needed_by: idea.needed_by ?? null,
+      occasion: idea.occasion ?? null,
       ...(linkChanged && {
         url: idea.url,
         url_key: idea.url ? normaliseUrl(idea.url) : null,
@@ -1083,7 +1204,7 @@ export default function Ideas() {
 
   const handleProductCreated = async (message, productId) => {
     const idea = productFor;
-    const { data: product } = await supabase.from('products').select('id, name, slug').eq('id', productId).single();
+    const { data: product } = await supabase.from('products').select('id, name, slug, price, cost_price, created_at').eq('id', productId).single();
     if (product) setProducts(ps => [...ps, product]);
     const { data, error } = await supabase.from('ideas')
       .update({ product_id: productId, status: 'listed' })
@@ -1166,27 +1287,45 @@ export default function Ideas() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
+    const isDueSoon = i => {
+      const days = daysUntil(i.needed_by, today);
+      return days != null && days >= 0 && days <= DUE_SOON_DAYS && i.status !== 'archived';
+    };
     return ideas.filter(i => i.pending || (
       (!filterSource || i.source === filterSource) &&
       (!filterTag || (i.tags || []).includes(filterTag)) &&
+      (!dueSoon || isDueSoon(i)) &&
       (!q || [i.title, i.notes, i.author, i.url, ...(i.tags || [])].some(v => v?.toLowerCase().includes(q)))
     ));
-  }, [ideas, search, filterSource, filterTag]);
+  }, [ideas, search, filterSource, filterTag, dueSoon, today]);
 
   const byCol = useMemo(() => {
     const out = Object.fromEntries(IDEA_STATUSES.map(s => [s.id, []]));
     for (const i of filtered) (out[i.status] || out.inbox).push(i);
     if (sortBy !== 'manual') {
-      const score = i => i.pending ? Infinity : sortBy === 'votes' ? (votesByIdea[i.id]?.length || 0) : new Date(i.created_at).getTime();
+      const score = i => {
+        if (i.pending) return Infinity;
+        if (sortBy === 'votes') return votesByIdea[i.id]?.length || 0;
+        if (sortBy === 'sales') return (i.product_id && sales[String(i.product_id)]?.units) || 0;
+        if (sortBy === 'deadline') {
+          // Soonest first; passed or undated ideas go to the bottom.
+          const days = daysUntil(i.needed_by, today);
+          return days == null || days < 0 ? -Infinity : -days;
+        }
+        return new Date(i.created_at).getTime();
+      };
       for (const col of Object.values(out)) col.sort((a, b) => score(b) - score(a));
     }
     return out;
-  }, [filtered, sortBy, votesByIdea]);
+  }, [filtered, sortBy, votesByIdea, sales, today]);
 
-  const hasFilters = filterSource || filterTag || search;
+  const hasFilters = filterSource || filterTag || search || dueSoon;
 
   const thisWeek = ideas.filter(i => !i.pending && new Date(i.created_at) > weekAgo).length;
   const total = ideas.filter(i => !i.pending).length;
+  // Units sold of products that started life as an idea.
+  const soldFromIdeas = [...new Set(ideas.map(i => i.product_id).filter(Boolean))]
+    .reduce((n, pid) => n + (sales[String(pid)]?.units || 0), 0);
 
   return (
     <div style={{ minHeight: '100vh', background: '#080808', display: 'flex', flexDirection: 'column' }}>
@@ -1202,6 +1341,7 @@ export default function Ideas() {
               <h1 style={{ margin: 0, fontFamily: "'Bebas Neue', sans-serif", fontSize: isMobile ? '1.4rem' : '1.75rem', color: '#fff', letterSpacing: '0.06em', lineHeight: 1 }}>Ideas</h1>
               <p style={{ margin: '2px 0 0', fontFamily: mono, fontSize: 9, color: '#444' }}>
                 {total} saved · {thisWeek} this week
+                {soldFromIdeas > 0 && <span style={{ color: '#22c55e' }}> · {soldFromIdeas} sold from ideas</span>}
                 {enrich && <span style={{ color: '#ff5500' }}> · fetching previews {enrich.done}/{enrich.total}</span>}
               </p>
             </div>
@@ -1235,10 +1375,21 @@ export default function Ideas() {
               <option value="manual">Sort: board order</option>
               <option value="votes">Sort: most votes</option>
               <option value="newest">Sort: newest</option>
+              <option value="deadline">Sort: needed by</option>
+              <option value="sales">Sort: best sellers</option>
             </select>
+            <button
+              onClick={() => setDueSoon(v => !v)}
+              aria-pressed={dueSoon}
+              title={`Ideas needed within ${DUE_SOON_DAYS} days`}
+              style={{ ...filterSelect, display: 'flex', alignItems: 'center', gap: 4, color: dueSoon ? '#ff5500' : '#777', borderColor: dueSoon ? 'rgba(255,85,0,0.4)' : 'rgba(255,255,255,0.07)' }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 13 }}>event</span>
+              Due soon
+            </button>
             {hasFilters && (
               <button
-                onClick={() => { setFilterSource(''); setFilterTag(''); setSearch(''); }}
+                onClick={() => { setFilterSource(''); setFilterTag(''); setSearch(''); setDueSoon(false); }}
                 style={{ ...filterSelect, display: 'flex', alignItems: 'center', gap: 4 }}
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 13 }}>filter_alt_off</span>
@@ -1289,6 +1440,9 @@ export default function Ideas() {
               membersById={membersById}
               votesByIdea={votesByIdea}
               myMemberId={member?.id}
+              sales={sales}
+              costsChangedAt={costsChangedAt}
+              today={today}
               onVote={handleVote}
               onCardClick={setModalIdea}
               onDragStart={handleDragStart}
@@ -1306,6 +1460,9 @@ export default function Ideas() {
                   membersById={membersById}
                   votesByIdea={votesByIdea}
                   myMemberId={member?.id}
+                  sales={sales}
+                  costsChangedAt={costsChangedAt}
+                  today={today}
                   onVote={handleVote}
                   onCardClick={setModalIdea}
                   onDragStart={handleDragStart}
@@ -1324,6 +1481,9 @@ export default function Ideas() {
           membersById={membersById}
           allTags={allTags}
           product={productsById[modalIdea.product_id]}
+          sale={modalIdea.product_id ? sales[String(modalIdea.product_id)] : null}
+          costStale={isCostStale(modalIdea, costsChangedAt)}
+          today={today}
           onTurnIntoProduct={handleTurnIntoProduct}
           onEstimate={handleEstimate}
           onClose={() => setModalIdea(null)}

@@ -124,6 +124,8 @@ export default function CreateOrderModal({ onClose, onCreated }) {
         price:    Number(it.price)    || 0,
         quantity: Number(it.quantity) || 1,
         image:    it.image || '',
+        // Links the line to the product so its sales show on the Ideas board.
+        ...(it.productId != null && { productId: it.productId }),
       }));
 
     const payload = {
@@ -325,12 +327,12 @@ export default function CreateOrderModal({ onClose, onCreated }) {
                       <ProductSearch
                         value={item.name}
                         products={products}
-                        onChange={(name) => updateItem(idx, 'name', name)}
+                        onChange={(name) => setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, name, productId: undefined } : it)))}
                         onSelect={(p) =>
                           setItems((prev) =>
                             prev.map((it, i) =>
                               i === idx
-                                ? { ...it, name: p.name, price: p.price || 0, image: p.img1 || '' }
+                                ? { ...it, name: p.name, price: p.price || 0, image: p.img1 || '', productId: p.id }
                                 : it
                             )
                           )

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
 import AdminNavbar from '../../components/admin/AdminNavbar';
+import { DUE_SOON_DAYS, daysUntil } from '../../lib/ideas';
 
 /* ─── Constants ──────────────────────────────────────────────────── */
 
@@ -157,7 +158,7 @@ export default function AdminDashboard() {
         .select('id, amount, date, category, title'),
       supabase
         .from('ideas')
-        .select('id, title, status, created_at, image_url'),
+        .select('id, title, status, created_at, image_url, needed_by, occasion'),
       supabase
         .from('idea_votes')
         .select('idea_id'),
@@ -186,6 +187,11 @@ export default function AdminDashboard() {
       testPrint:   ideas.filter((i) => i.status === 'test_print').length,
       top,
       topVotes:    top ? counts[top.id] : 0,
+      // Soonest seasonal idea that still has to be listed.
+      nextDeadline: ideas
+        .map((i) => ({ ...i, days: daysUntil(i.needed_by) }))
+        .filter((i) => i.days != null && i.days >= 0 && i.days <= DUE_SOON_DAYS && !['listed', 'archived'].includes(i.status))
+        .sort((a, b) => a.days - b.days)[0],
     };
   })();
 
@@ -605,6 +611,17 @@ export default function AdminDashboard() {
                       <span className="material-symbols-outlined" style={{ fontSize: 13 }}>thumb_up</span>
                       {ideaStats.topVotes}
                     </span>
+                  </div>
+                )}
+                {ideaStats.nextDeadline && (
+                  <div className="flex items-center gap-3 px-4 py-3 border-t border-white/5">
+                    <span className={`material-symbols-outlined flex-shrink-0 ${ideaStats.nextDeadline.days <= 14 ? 'text-red-400' : 'text-amber-400'}`} style={{ fontSize: 18 }}>event</span>
+                    <div className="flex-1 min-w-0">
+                      <p className={`font-technical text-[9px] uppercase tracking-widest ${ideaStats.nextDeadline.days <= 14 ? 'text-red-400' : 'text-amber-400'}`}>
+                        {ideaStats.nextDeadline.occasion || 'Needed'} in {ideaStats.nextDeadline.days}d
+                      </p>
+                      <p className="font-body text-white text-sm truncate">{ideaStats.nextDeadline.title}</p>
+                    </div>
                   </div>
                 )}
                 <div className="px-4 py-3 border-t border-white/5 font-technical text-[10px] uppercase tracking-widest text-stone-500 group-hover:text-[#ff5500] transition-colors flex items-center gap-1">

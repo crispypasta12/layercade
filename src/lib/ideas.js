@@ -111,3 +111,90 @@ export function removeIdeaImage(supabase, imageUrl) {
 export function normaliseTag(tag) {
   return tag.trim().toLowerCase().replace(/^#/, '').replace(/\s+/g, ' ').slice(0, 30);
 }
+
+// ─── Target dates ────────────────────────────────────────────────────
+// needed_by is a plain date ("2027-03-10"), compared in local time.
+
+export const DUE_SOON_DAYS = 45;
+
+function isoDate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+export function daysUntil(dateStr, today = new Date()) {
+  if (!dateStr) return null;
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.round((new Date(y, m - 1, d) - start) / 86400000);
+}
+
+// nth weekday of a month, e.g. Mother's Day = 2nd Sunday of May.
+function nthWeekday(year, month, weekday, n) {
+  const first = new Date(year, month - 1, 1);
+  return new Date(year, month - 1, 1 + ((weekday - first.getDay() + 7) % 7) + (n - 1) * 7);
+}
+
+// Eid follows moon sighting, so these are estimates to adjust once announced.
+const EID_DATES = [
+  ['Eid ul-Fitr', '2027-03-10'], ['Eid ul-Adha', '2027-05-17'],
+  ['Eid ul-Fitr', '2028-02-27'], ['Eid ul-Adha', '2028-05-06'],
+];
+
+// The next date of each occasion the shop sells for, soonest first.
+export function upcomingOccasions(today = new Date()) {
+  const out = [];
+  for (const year of [today.getFullYear(), today.getFullYear() + 1]) {
+    out.push(
+      { label: "Valentine's Day", date: isoDate(new Date(year, 1, 14)) },
+      { label: 'Pohela Boishakh', date: isoDate(new Date(year, 3, 14)) },
+      { label: "Mother's Day",    date: isoDate(nthWeekday(year, 5, 0, 2)) },
+      { label: "Father's Day",    date: isoDate(nthWeekday(year, 6, 0, 3)) },
+      { label: 'Victory Day',     date: isoDate(new Date(year, 11, 16)) },
+      { label: 'Christmas',       date: isoDate(new Date(year, 11, 25)) },
+    );
+  }
+  for (const [label, date] of EID_DATES) out.push({ label, date, estimated: true });
+  const seen = new Set();
+  return out
+    .filter(o => daysUntil(o.date, today) >= 0)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .filter(o => !seen.has(o.label) && seen.add(o.label));
+}
+
+// How a card should show its target date: tone is 'urgent' (two weeks or
+// less), 'soon', 'later', 'done' (already listed) or 'past'.
+export function deadlineInfo(idea, today = new Date()) {
+  const days = daysUntil(idea.needed_by, today);
+  if (days == null) return null;
+  const name = idea.occasion || 'Needed';
+  if (idea.status === 'listed') return { days, tone: 'done', label: `Ready for ${idea.occasion || 'the date'}` };
+  if (days < 0) return { days, tone: 'past', label: `${idea.occasion || 'Date'} passed` };
+  const when = days === 0 ? 'today' : days === 1 ? 'tomorrow' : `in ${days}d`;
+  return { days, tone: days <= 14 ? 'urgent' : days <= DUE_SOON_DAYS ? 'soon' : 'later', label: `${name} ${when}` };
+}
+
+// ─── Sales of listed ideas ───────────────────────────────────────────
+// Shop orders carry productId on each line; orders typed in by hand only
+// carry the product name, so those are matched by name.
+
+export function salesByProduct(orders, products) {
+  const byName = new Map(products.map(p => [p.name.trim().toLowerCase(), p.id]));
+  const ids = new Set(products.map(p => String(p.id)));
+  const out = {};
+  for (const order of orders) {
+    const counted = new Set();
+    for (const line of order.items || []) {
+      const pid = line.productId != null && ids.has(String(line.productId))
+        ? String(line.productId)
+        : byName.get(String(line.name || '').trim().toLowerCase())?.toString();
+      if (!pid) continue;
+      const s = (out[pid] ||= { orders: 0, units: 0, revenue: 0, lastAt: null });
+      const qty = Number(line.quantity) || 1;
+      s.units += qty;
+      s.revenue += (Number(line.price) || 0) * qty;
+      if (!counted.has(pid)) { s.orders += 1; counted.add(pid); }
+      if (!s.lastAt || order.created_at > s.lastAt) s.lastAt = order.created_at;
+    }
+  }
+  return out;
+}

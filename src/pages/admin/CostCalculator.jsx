@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import AdminNavbar from '../../components/admin/AdminNavbar';
 import { supabase } from '../../lib/supabase';
+import { markPricesChanged } from '../../lib/costing';
 
 /* ─── Defaults ───────────────────────────────────────────────────── */
 
@@ -22,18 +23,51 @@ const DEFAULT_SETTINGS = {
   startup_spike_watts:        300,
   startup_duration_mins:      5,
   printing_power_watts:       150,
+  setup_labor_rate:           150,
+  post_processing_labor_rate: 150,
+  design_labor_rate:          300,
+  nozzle_wear_rate:           2,
+  build_plate_adhesive_cost:  5,
+  cleaning_supplies_cost:     3,
+  failure_rate:               5,
+  markup:                     40,
+  price_rounding:             10,
+  minimum_price:              50,
+  currency:                   'BDT',
+  version:                    2,
+};
+
+// The first defaults were US-dollar figures (e.g. 0.12/kWh, 15/hr labour).
+// Settings saved before version 2 still holding one of those get the taka
+// default instead; anything someone changed by hand is kept.
+const USD_ERA_DEFAULTS = {
+  electricity_rate:           0.12,
   setup_labor_rate:           15,
   post_processing_labor_rate: 15,
   design_labor_rate:          25,
   nozzle_wear_rate:           0.05,
   build_plate_adhesive_cost:  0.25,
   cleaning_supplies_cost:     0.15,
-  failure_rate:               5,
-  markup:                     40,
   price_rounding:             5,
   minimum_price:              5,
-  currency:                   'BDT',
 };
+
+function loadSettings() {
+  const saved = load('calc_settings', null);
+  if (!saved) return DEFAULT_SETTINGS;
+  const merged = { ...DEFAULT_SETTINGS, ...saved };
+  if ((saved.version ?? 1) < 2) {
+    if (merged.currency === 'BDT') {
+      for (const [key, old] of Object.entries(USD_ERA_DEFAULTS)) {
+        if (saved[key] === old) merged[key] = DEFAULT_SETTINGS[key];
+      }
+    }
+    merged.version = 2;
+    save('calc_settings', merged);
+    markPricesChanged();
+  }
+  return merged;
+}
 
 const DEFAULT_INPUTS = {
   print_hours:          3.5,
@@ -85,11 +119,18 @@ function load(key, fallback) {
   }
 }
 function save(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* not persisted */ }
 }
 
 /* ─── Core calculation ───────────────────────────────────────────── */
 
+// Two ways to describe a job:
+//   Per piece — pieces are printed one at a time. Print hours and weights are
+//     for ONE piece, and each print has its own startup, setup and supplies.
+//   Batch     — all pieces share one plate. Print hours and weights are for the
+//     WHOLE plate, so they, the startup, setup and supplies are shared out.
+// Post-processing is always per piece; design time is once for the order.
+// Everything is worked out per piece, then multiplied by the quantity.
 function calculate(inputs, selectedMaterials, allMaterials, settings) {
   const {
     print_hours, quantity, is_batch,
@@ -99,42 +140,44 @@ function calculate(inputs, selectedMaterials, allMaterials, settings) {
 
   if (!selectedMaterials.length || !print_hours || !quantity) return null;
 
+  const perPlate = is_batch ? quantity : 1; // pieces sharing each print
+
   // 1. Material cost
-  let rawMaterialCost = 0;
+  let plateMaterialCost = 0;
   for (const sm of selectedMaterials) {
     const mat = allMaterials.find((m) => m.id === sm.materialId);
     if (!mat || !sm.weight_g) continue;
     const kg = sm.weight_g / 1000;
-    rawMaterialCost += kg * mat.price_per_kg;
+    plateMaterialCost += kg * mat.price_per_kg;
   }
+  const rawMaterialCost = plateMaterialCost / perPlate;
   const supportAddon = rawMaterialCost * (s.support_material_factor / 100);
   const materialCost = rawMaterialCost + supportAddon;
 
-  // 2. Electricity cost
-  const startupCost = (s.startup_spike_watts * s.startup_duration_mins / 60) / 1000 * s.electricity_rate;
-  const printCost   = (s.printing_power_watts * print_hours) / 1000 * s.electricity_rate;
+  // 2. Electricity cost (kWh × rate), once per print
+  const startupCost = (s.startup_spike_watts * s.startup_duration_mins / 60) / 1000 * s.electricity_rate / perPlate;
+  const printCost   = (s.printing_power_watts * print_hours) / 1000 * s.electricity_rate / perPlate;
   const electricityCost = startupCost + printCost;
 
   // 3. Labor cost (print time NOT counted)
-  const batchDiv = is_batch ? quantity : 1;
-  const setupLaborCost         = (setup_time_mins / 60) / batchDiv * s.setup_labor_rate;
-  const postProcessingLaborCost = (post_processing_mins / 60) / batchDiv * s.post_processing_labor_rate;
-  const designLaborCost        = (cad_design_mins / 60) / batchDiv * s.design_labor_rate;
+  const setupLaborCost          = (setup_time_mins / 60) * s.setup_labor_rate / perPlate;
+  const postProcessingLaborCost = (post_processing_mins / 60) * s.post_processing_labor_rate;
+  const designLaborCost         = (cad_design_mins / 60) * s.design_labor_rate / quantity;
   const laborCost = setupLaborCost + postProcessingLaborCost + designLaborCost;
 
-  // 4. Consumables
-  const nozzleCost     = print_hours * s.nozzle_wear_rate;
-  const adhesiveCost   = s.build_plate_adhesive_cost / batchDiv;
-  const cleaningCost   = s.cleaning_supplies_cost / batchDiv;
+  // 4. Consumables, once per print
+  const nozzleCost     = print_hours * s.nozzle_wear_rate / perPlate;
+  const adhesiveCost   = s.build_plate_adhesive_cost / perPlate;
+  const cleaningCost   = s.cleaning_supplies_cost / perPlate;
   const consumablesCost = nozzleCost + adhesiveCost + cleaningCost;
 
-  // 5. Subtotal + failure buffer
+  // 5. Subtotal + failure buffer (all per piece)
   const subtotal   = materialCost + electricityCost + laborCost + consumablesCost;
   const failureAdd = subtotal * (s.failure_rate / 100);
-  const totalCost  = subtotal + failureAdd;
+  const netCostPerPiece = subtotal + failureAdd;
 
-  // 6. Cost per piece
-  const netCostPerPiece = totalCost / quantity;
+  // 6. Whole order
+  const totalCost = netCostPerPiece * quantity;
 
   // 7. Pricing
   const rawPrice     = netCostPerPiece * (1 + s.markup / 100);
@@ -345,6 +388,8 @@ function MaterialLibrary({ materials, setMaterials, currency }) {
       setMaterials(updated);
       save('calc_materials', updated);
     } else {
+      const before = materials.find((m) => m.id === editing);
+      if (before && before.price_per_kg !== parseFloat(form.price_per_kg)) markPricesChanged();
       const updated = materials.map((m) =>
         m.id === editing
           ? { ...m, material: form.material.trim(), price_per_kg: parseFloat(form.price_per_kg) }
@@ -497,25 +542,27 @@ function SettingsPanel({ settings, setSettings }) {
     const next = { ...settings, [key]: val };
     setSettings(next);
     save('calc_settings', next);
+    markPricesChanged();
   };
+  const c = settings.currency === 'BDT' ? '৳' : '$';
 
   const fields = [
     { key: 'currency',                  label: 'Currency',               tip: 'BDT or USD', isSelect: true, options: ['BDT', 'USD'] },
-    { key: 'electricity_rate',          label: 'Electricity Rate ($/kWh)', tip: 'Cost of electricity per kilowatt-hour', step: 0.01, min: 0 },
+    { key: 'electricity_rate',          label: `Electricity Rate (${c}/kWh)`, tip: 'Cost of electricity per kilowatt-hour', step: 0.01, min: 0 },
     { key: 'support_material_factor',   label: 'Support Material (%)',     tip: 'Extra material used for supports', step: 1, min: 0 },
     { key: 'startup_spike_watts',       label: 'Startup Spike (W)',        tip: 'Wattage during printer startup', step: 10, min: 0 },
     { key: 'startup_duration_mins',     label: 'Startup Duration (min)',   tip: 'How long the startup spike lasts', step: 1, min: 0 },
     { key: 'printing_power_watts',      label: 'Printing Power (W)',       tip: 'Typical wattage during printing', step: 10, min: 0 },
-    { key: 'setup_labor_rate',          label: 'Setup Labor ($/hr)',       tip: 'Hourly rate for printer setup', step: 0.5, min: 0 },
-    { key: 'post_processing_labor_rate',label: 'Post-Processing Labor ($/hr)', tip: 'Hourly rate for post-processing', step: 0.5, min: 0 },
-    { key: 'design_labor_rate',         label: 'Design Labor ($/hr)',      tip: 'Hourly rate for CAD/design work', step: 0.5, min: 0 },
-    { key: 'nozzle_wear_rate',          label: 'Nozzle Wear ($/hr)',       tip: '$2 nozzle lasting ~40 hours = $0.05/hr', step: 0.01, min: 0 },
-    { key: 'build_plate_adhesive_cost', label: 'Adhesive Cost ($/print)',  tip: 'Glue stick, hairspray, etc.', step: 0.05, min: 0 },
-    { key: 'cleaning_supplies_cost',    label: 'Cleaning Supplies ($/print)', tip: 'IPA, paper towels, etc.', step: 0.05, min: 0 },
+    { key: 'setup_labor_rate',          label: `Setup Labor (${c}/hr)`,       tip: 'Hourly rate for printer setup', step: 0.5, min: 0 },
+    { key: 'post_processing_labor_rate',label: `Post-Processing Labor (${c}/hr)`, tip: 'Hourly rate for post-processing', step: 0.5, min: 0 },
+    { key: 'design_labor_rate',         label: `Design Labor (${c}/hr)`,      tip: 'Hourly rate for CAD/design work', step: 0.5, min: 0 },
+    { key: 'nozzle_wear_rate',          label: `Nozzle Wear (${c}/hr)`,       tip: 'Nozzle price ÷ hours it lasts, e.g. ৳400 over 200 h = ৳2/hr', step: 0.01, min: 0 },
+    { key: 'build_plate_adhesive_cost', label: `Adhesive Cost (${c}/print)`,  tip: 'Glue stick, hairspray, etc.', step: 0.05, min: 0 },
+    { key: 'cleaning_supplies_cost',    label: `Cleaning Supplies (${c}/print)`, tip: 'IPA, paper towels, etc.', step: 0.05, min: 0 },
     { key: 'failure_rate',              label: 'Failure Buffer (%)',        tip: 'Buffer for failed prints', step: 1, min: 0 },
     { key: 'markup',                    label: 'Markup (%)',               tip: 'Profit markup on top of cost', step: 5, min: 0 },
-    { key: 'price_rounding',            label: 'Price Rounding ($)',       tip: 'Round final price to nearest X', step: 1, min: 1 },
-    { key: 'minimum_price',             label: 'Minimum Price ($)',        tip: 'Floor price per piece', step: 1, min: 0 },
+    { key: 'price_rounding',            label: `Price Rounding (${c})`,       tip: 'Round final price to nearest X', step: 1, min: 1 },
+    { key: 'minimum_price',             label: `Minimum Price (${c})`,        tip: 'Floor price per piece', step: 1, min: 0 },
   ];
 
   return (
@@ -548,6 +595,7 @@ function SettingsPanel({ settings, setSettings }) {
         onClick={() => {
           setSettings(DEFAULT_SETTINGS);
           save('calc_settings', DEFAULT_SETTINGS);
+          markPricesChanged();
         }}
         className="font-technical text-[10px] uppercase tracking-widest text-stone-600
                    hover:text-red-400 transition-colors flex items-center gap-1"
@@ -681,6 +729,7 @@ function CostBreakdown({ result, inputs, settings }) {
     <div className="space-y-1">
       {/* Material */}
       <div className="pb-1 mb-1 border-b border-white/5">
+        <p className="font-technical text-[9px] text-stone-600 uppercase tracking-widest pb-1">Per piece</p>
         <BreakdownRow label="Material Cost" value={result.materialCost} fmt={fmt} />
         <BreakdownRow label={`Raw Material`} value={result.rawMaterialCost} fmt={fmt} indent={1} />
         <BreakdownRow label={`Support Factor (${settings.support_material_factor}%)`} value={result.supportAddon} fmt={fmt} indent={1} />
@@ -718,17 +767,17 @@ function CostBreakdown({ result, inputs, settings }) {
       {/* Total cost */}
       <div className="py-2 mb-2 border-b border-[#ff5500]/20">
         <div className="flex items-center justify-between">
-          <span className="font-technical text-xs text-[#ff5500] uppercase tracking-widest font-bold">Total Cost</span>
+          <span className="font-technical text-xs text-[#ff5500] uppercase tracking-widest font-bold">Cost / Piece</span>
           <span className="font-mono text-sm text-[#ff5500] font-bold" style={{ fontFamily: "'Space Mono', monospace" }}>
-            {fmt(result.totalCost)}
+            {fmt(result.netCostPerPiece)}
           </span>
         </div>
         <div className="flex items-center justify-between mt-1">
           <span className="font-technical text-[10px] text-stone-500 uppercase tracking-widest">
-            Cost / piece (qty {inputs.quantity})
+            Total cost (×{inputs.quantity})
           </span>
           <span className="font-mono text-xs text-stone-300" style={{ fontFamily: "'Space Mono', monospace" }}>
-            {fmt(result.netCostPerPiece)}
+            {fmt(result.totalCost)}
           </span>
         </div>
       </div>
@@ -779,7 +828,7 @@ function CostBreakdown({ result, inputs, settings }) {
 
 export default function CostCalculator() {
   const [materials,      setMaterials]      = useState(() => load('calc_materials', DEFAULT_MATERIALS));
-  const [settings,       setSettings]       = useState(() => load('calc_settings',  DEFAULT_SETTINGS));
+  const [settings,       setSettings]       = useState(loadSettings);
   const [presets,        setPresets]        = useState(() => load('calc_presets',   DEFAULT_PRESETS));
   // Opened from an idea on the Ideas board: start from its print estimate.
   const fromIdea = useLocation().state?.idea ?? null;
@@ -882,13 +931,16 @@ export default function CostCalculator() {
             onSave={async () => {
               setSavingToIdea(true);
               setSaveToIdeaError(null);
-              const totalWeight = selectedMats.reduce((sum, m) => sum + (Number(m.weight_g) || 0), 0);
+              // The idea keeps a per-piece estimate; batch inputs are for the plate.
+              const perPlate = inputs.is_batch ? inputs.quantity : 1;
+              const totalWeight = selectedMats.reduce((sum, m) => sum + (Number(m.weight_g) || 0), 0) / perPlate;
+              const hours = Number(inputs.print_hours) / perPlate;
               const { error } = await supabase.from('ideas').update({
                 est_cost:        Math.round(result.netCostPerPiece * 100) / 100,
                 est_price:       result.finalPricePerPiece,
                 costed_at:       new Date().toISOString(),
                 // Keep any tweaks made here as the idea's estimate too.
-                est_print_hours: Number(inputs.print_hours) > 0 ? Number(inputs.print_hours) : null,
+                est_print_hours: hours > 0 ? Math.round(hours * 100) / 100 : null,
                 est_filament_g:  totalWeight > 0 ? Math.round(totalWeight) : null,
               }).eq('id', fromIdea.id);
               setSavingToIdea(false);
@@ -965,7 +1017,9 @@ export default function CostCalculator() {
                         </select>
                       </div>
                       <div className="w-32 space-y-1.5">
-                        <Label tip="Weight used in grams">Weight (g)</Label>
+                        <Label tip={inputs.is_batch ? 'Grams for the whole plate' : 'Grams for one piece'}>
+                          {inputs.is_batch ? 'Weight (plate)' : 'Weight (g)'}
+                        </Label>
                         <NumInput
                           value={sm.weight_g}
                           onChange={(v) => updateMaterial(idx, 'weight_g', v)}
@@ -991,7 +1045,9 @@ export default function CostCalculator() {
                 <SectionHeader>Print Details</SectionHeader>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
-                    <Label tip="Total print time in hours (e.g. 3.5)">Print Hours</Label>
+                    <Label tip={inputs.is_batch ? 'Print time for the whole plate' : 'Print time for one piece'}>
+                      {inputs.is_batch ? 'Print Hours (plate)' : 'Print Hours (1 piece)'}
+                    </Label>
                     <NumInput value={inputs.print_hours} onChange={(v) => updateInput('print_hours', v)} min={0} step={0.5} />
                   </div>
                   <div className="space-y-1.5">
@@ -999,7 +1055,7 @@ export default function CostCalculator() {
                     <NumInput value={inputs.quantity} onChange={(v) => updateInput('quantity', Math.max(1, Math.round(v)))} min={1} step={1} />
                   </div>
                   <div className="space-y-1.5 col-span-2 sm:col-span-1">
-                    <Label tip="When enabled, setup & consumables are split across all pieces">Batch Mode</Label>
+                    <Label tip="Batch: all pieces print together on one plate, so enter the plate's print time and weight. Per piece: pieces print one at a time, so enter one piece's numbers.">Batch Mode</Label>
                     <label className="flex items-center gap-3 h-[38px] cursor-pointer">
                       <div
                         onClick={() => updateInput('is_batch', !inputs.is_batch)}
@@ -1012,7 +1068,7 @@ export default function CostCalculator() {
                         }`} />
                       </div>
                       <span className="font-technical text-[10px] text-stone-400 uppercase tracking-widest">
-                        {inputs.is_batch ? 'Batch' : 'Per Piece'}
+                        {inputs.is_batch ? 'One plate' : 'Per Piece'}
                       </span>
                     </label>
                   </div>
@@ -1027,15 +1083,15 @@ export default function CostCalculator() {
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
-                    <Label tip="Time spent preparing the printer, slicing, and loading">Setup Time (min)</Label>
+                    <Label tip="Preparing the printer, slicing and loading, for each print">Setup / print (min)</Label>
                     <NumInput value={inputs.setup_time_mins} onChange={(v) => updateInput('setup_time_mins', v)} min={0} step={5} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label tip="Time for removing supports, sanding, painting">Post-Processing (min)</Label>
+                    <Label tip="Removing supports, sanding, painting — for each piece">Post-Process / piece (min)</Label>
                     <NumInput value={inputs.post_processing_mins} onChange={(v) => updateInput('post_processing_mins', v)} min={0} step={5} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label tip="Time spent on CAD design/modeling (if billable)">CAD / Design (min)</Label>
+                    <Label tip="CAD design/modelling for the whole order (if billable)">CAD / Design, total (min)</Label>
                     <NumInput value={inputs.cad_design_mins} onChange={(v) => updateInput('cad_design_mins', v)} min={0} step={5} />
                   </div>
                 </div>

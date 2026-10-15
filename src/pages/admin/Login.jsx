@@ -1,10 +1,13 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
 
 export default function AdminLogin() {
   const navigate = useNavigate();
+  // Only return to admin pages, never an arbitrary URL.
+  const from = useLocation().state?.from;
+  const returnTo = typeof from === 'string' && from.startsWith('/admin/') && !from.startsWith('/admin/login') ? from : '/admin/expenses';
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
   const [loading,  setLoading]  = useState(false);
@@ -25,7 +28,7 @@ export default function AdminLogin() {
     }
 
     sessionStorage.setItem('show_welcome', '1');
-    navigate('/admin/expenses', { replace: true });
+    navigate(returnTo, { replace: true });
   };
 
   const inputClass =

@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import AdminNavbar from '../../components/admin/AdminNavbar';
 import ProductFormModal from '../../components/admin/ProductFormModal';
+import IdeaImportModal from '../../components/admin/IdeaImportModal';
+import PhoneSaveHelp from '../../components/admin/PhoneSaveHelp';
 import { supabase } from '../../lib/supabase';
 import { useCurrentMember } from '../../contexts/CurrentMemberContext';
 import {
@@ -605,6 +607,11 @@ const imageAction = {
   cursor: 'pointer', padding: 4, display: 'flex',
 };
 
+const headerIconButton = {
+  display: 'flex', alignItems: 'center', background: 'none', border: '1px solid rgba(255,255,255,0.08)',
+  color: '#666', cursor: 'pointer', padding: '7px 9px',
+};
+
 const filterSelect = { background: '#111', border: '1px solid rgba(255,255,255,0.07)', color: '#777', fontSize: 10, padding: '6px 8px', outline: 'none', fontFamily: mono, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em', flexShrink: 0 };
 
 // ─── Capture Bar ──────────────────────────────────────────────
@@ -676,6 +683,13 @@ function CaptureBar({ onCapture, onCaptureImage }) {
   );
 }
 
+// Swap a "Fetching preview…" placeholder for the saved idea. If the board was
+// reloaded in the meantime the placeholder is gone, so add the idea instead.
+function replacePending(ideas, tempId, saved) {
+  if (ideas.some(i => i.id === tempId)) return ideas.map(i => i.id === tempId ? saved : i);
+  return ideas.some(i => i.id === saved.id) ? ideas : [saved, ...ideas];
+}
+
 // ─── Page ─────────────────────────────────────────────────────
 
 export default function Ideas() {
@@ -691,6 +705,11 @@ export default function Ideas() {
   const [votes,     setVotes]     = useState([]);
   const [products,  setProducts]  = useState([]);
   const [productFor, setProductFor] = useState(null); // idea being turned into a product
+  const [showImport, setShowImport] = useState(false);
+  const [showPhoneHelp, setShowPhoneHelp] = useState(false);
+  const [enrich,     setEnrich]     = useState(null); // { done, total } while fetching previews after an import
+  const [searchParams, setSearchParams] = useSearchParams();
+  const shareHandled = useRef(false);
   const navigate = useNavigate();
   const [filterSource, setFilterSource] = useState('');
   const [filterTag,    setFilterTag]    = useState('');
@@ -704,15 +723,20 @@ export default function Ideas() {
     setToast({ message, tone, action });
     toastTimer.current = setTimeout(() => setToast(null), action ? 7000 : 4000);
   };
+  const showToastRef = useRef(showToast);
 
   // ── Load ──
   useEffect(() => {
+    // Ignore a superseded load (React dev runs effects twice) so it can't
+    // overwrite ideas saved after it started, e.g. a link shared from a phone.
+    let stale = false;
     Promise.all([
       supabase.from('ideas').select('*').order('position').order('created_at', { ascending: false }),
       supabase.from('members').select('id, name, color'),
       supabase.from('idea_votes').select('idea_id, member_id'),
       supabase.from('products').select('id, name, slug'),
     ]).then(([i, m, v, p]) => {
+      if (stale) return;
       setProducts(p.data || []);
       if (i.error) showToast(`Couldn't load ideas: ${i.error.message}`, 'error');
       setIdeas(i.data || []);
@@ -720,6 +744,7 @@ export default function Ideas() {
       setVotes(v.data || []);
       setLoading(false);
     });
+    return () => { stale = true; };
   }, []);
 
   const membersById = useMemo(() => Object.fromEntries(members.map(m => [m.id, m])), [members]);
@@ -777,7 +802,7 @@ export default function Ideas() {
       return;
     }
 
-    setIdeas(is => is.map(i => i.id === tempId ? data : i));
+    setIdeas(is => replacePending(is, tempId, data));
     if (!preview?.image_url) {
       showToast('Saved, but the site hid its picture.', 'info', { label: 'Add screenshot', run: () => setModalIdea(data) });
     }
@@ -815,13 +840,28 @@ export default function Ideas() {
       showToast(`Couldn't save: ${error.message}`, 'error');
       return;
     }
-    setIdeas(is => is.map(i => i.id === tempId ? data : i));
+    setIdeas(is => replacePending(is, tempId, data));
     setModalIdea(data);
   };
 
   // Paste a screenshot anywhere on the page (outside text fields and the popup).
   const captureImageRef = useRef(handleCaptureImage);
-  useEffect(() => { captureImageRef.current = handleCaptureImage; });
+  const captureLinkRef = useRef(handleCapture);
+  useEffect(() => { captureImageRef.current = handleCaptureImage; captureLinkRef.current = handleCapture; });
+
+  // Shared from a phone: Android's share target and the iPhone Shortcut both
+  // open /admin/ideas?url=… (or ?text=… when the app shares "caption + link").
+  // Waits for the board to load so the duplicate check sees existing ideas.
+  useEffect(() => {
+    if (loading || shareHandled.current) return;
+    const values = ['url', 'text', 'title'].map(k => searchParams.get(k)).filter(Boolean);
+    if (values.length === 0) return;
+    shareHandled.current = true;
+    setSearchParams({}, { replace: true });
+    const link = values.map(extractUrl).find(Boolean);
+    if (link) captureLinkRef.current(link);
+    else showToastRef.current('Nothing saved: what you shared didn\'t include a link.', 'error');
+  }, [loading, searchParams, setSearchParams]);
   useEffect(() => {
     if (modalIdea) return;
     const onPaste = e => {
@@ -883,6 +923,36 @@ export default function Ideas() {
     setIdeas(is => is.map(i => i.id === data.id ? data : i));
     if (!keepOpen) setModalIdea(null);
     return data;
+  };
+
+  // ── Import ──
+  // After an import, fetch thumbnails (and titles for rows that had none) one
+  // at a time in the background, the same way a pasted link gets them.
+  const enrichIdeas = async (rows, autoTitled) => {
+    const todo = rows.filter(r => r.url && !r.image_url);
+    if (!todo.length) return;
+    setEnrich({ done: 0, total: todo.length });
+    for (const [n, idea] of todo.entries()) {
+      const { data: preview } = await supabase.functions.invoke('idea-preview', { body: { url: idea.url } });
+      const patch = {};
+      if (preview?.image_url) patch.image_url = preview.image_url;
+      if (preview?.author && !idea.author) patch.author = preview.author;
+      if (preview?.title && autoTitled.has(idea.url_key)) patch.title = preview.title;
+      if (Object.keys(patch).length) {
+        const { data } = await supabase.from('ideas').update(patch).eq('id', idea.id).select().maybeSingle();
+        if (data) setIdeas(is => is.map(i => i.id === data.id ? data : i));
+        else removeIdeaImage(supabase, patch.image_url); // deleted meanwhile
+      }
+      setEnrich({ done: n + 1, total: todo.length });
+    }
+    setEnrich(null);
+  };
+
+  const handleImported = (rows, autoTitled) => {
+    setShowImport(false);
+    setIdeas(is => [...is, ...rows].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)));
+    showToast(`Imported ${rows.length} idea${rows.length === 1 ? '' : 's'}.`);
+    enrichIdeas(rows, autoTitled);
   };
 
   // ── Next steps ──
@@ -1020,8 +1090,15 @@ export default function Ideas() {
               <h1 style={{ margin: 0, fontFamily: "'Bebas Neue', sans-serif", fontSize: isMobile ? '1.4rem' : '1.75rem', color: '#fff', letterSpacing: '0.06em', lineHeight: 1 }}>Ideas</h1>
               <p style={{ margin: '2px 0 0', fontFamily: mono, fontSize: 9, color: '#444' }}>
                 {total} saved · {thisWeek} this week
+                {enrich && <span style={{ color: '#ff5500' }}> · fetching previews {enrich.done}/{enrich.total}</span>}
               </p>
             </div>
+            <button onClick={() => setShowPhoneHelp(true)} title="Save from your phone" style={headerIconButton}>
+              <span className="material-symbols-outlined" style={{ fontSize: 17 }}>smartphone</span>
+            </button>
+            <button onClick={() => setShowImport(true)} title="Import from Google Sheets" style={headerIconButton}>
+              <span className="material-symbols-outlined" style={{ fontSize: 17 }}>upload_file</span>
+            </button>
             <div style={{ position: 'relative' }}>
               <span className="material-symbols-outlined" style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 15, color: '#333', pointerEvents: 'none' }}>search</span>
               <input
@@ -1139,6 +1216,18 @@ export default function Ideas() {
           onDelete={handleDelete}
         />
       )}
+
+      {showImport && (
+        <IdeaImportModal
+          members={members}
+          existingKeys={ideas.map(i => i.url_key).filter(Boolean)}
+          startPosition={ideas.reduce((m, i) => Math.max(m, i.position ?? 0), 0) + 1}
+          onClose={() => setShowImport(false)}
+          onImported={handleImported}
+        />
+      )}
+
+      {showPhoneHelp && <PhoneSaveHelp onClose={() => setShowPhoneHelp(false)} />}
 
       <AnimatePresence>
         {productFor && (

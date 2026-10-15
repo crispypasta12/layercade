@@ -1,0 +1,19 @@
+{
+  "name": "Layercade Ideas",
+  "short_name": "LC Ideas",
+  "description": "Save print ideas to the Layercade admin straight from the share menu.",
+  "start_url": "/admin/ideas",
+  "scope": "/admin/",
+  "display": "standalone",
+  "background_color": "#080808",
+  "theme_color": "#080808",
+  "icons": [
+    { "src": "/admin/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/admin/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ],
+  "share_target": {
+    "action": "/admin/ideas",
+    "method": "GET",
+    "params": { "title": "title", "text": "text", "url": "url" }
+  }
+}

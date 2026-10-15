@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { CurrentMemberProvider, useCurrentMember } from '../contexts/CurrentMemberContext';
 import WelcomeGuard from './admin/WelcomeScreen';
 
 export default function ProtectedRoute({ children }) {
+  const location = useLocation();
   const [session, setSession] = useState(undefined); // undefined = loading
 
   useEffect(() => {
@@ -31,7 +32,9 @@ export default function ProtectedRoute({ children }) {
   }
 
   if (!session) {
-    return <Navigate to="/admin/login" replace />;
+    // Remember where we were going (e.g. a link shared to the Ideas board) so
+    // login can come back to it.
+    return <Navigate to="/admin/login" replace state={{ from: location.pathname + location.search }} />;
   }
 
   return (

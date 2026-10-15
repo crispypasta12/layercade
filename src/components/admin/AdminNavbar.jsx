@@ -40,7 +40,25 @@ const NAV_LINKS = [
   { label: 'Reviews',   to: '/admin/reviews',                icon: 'rate_review' },
 ];
 
+// Admin-only web app manifest: lets the team install the admin to their home
+// screen and share links into the Ideas board (public/admin/manifest.webmanifest).
+// Added from here rather than index.html so shoppers never get an install prompt.
+function useAdminManifest() {
+  useEffect(() => {
+    const add = (rel, href) => {
+      if (document.head.querySelector(`link[rel="${rel}"]`)) return;
+      const link = document.createElement('link');
+      link.rel = rel;
+      link.href = href;
+      document.head.appendChild(link);
+    };
+    add('manifest', '/admin/manifest.webmanifest');
+    add('apple-touch-icon', '/admin/icon-192.png');
+  }, []);
+}
+
 export default function AdminNavbar() {
+  useAdminManifest();
   const navigate  = useNavigate();
   const location  = useLocation();
   const { member } = useCurrentMember();

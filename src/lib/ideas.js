@@ -61,3 +61,53 @@ export function titleFromUrl(url) {
     .join(' ')
     .slice(0, 140);
 }
+
+// ─── Screenshots ────────────────────────────────────────────────────────────
+// Ideas whose site hides its preview (Instagram, MakerWorld) get a pasted or
+// uploaded screenshot instead. Phone screenshots are several MB, so shrink to
+// 1200px on the long edge and re-encode as WebP before uploading.
+
+const IDEA_BUCKET = 'idea-images';
+const MAX_EDGE = 1200;
+
+export function firstImageFile(dataTransfer) {
+  if (!dataTransfer) return null;
+  return [...(dataTransfer.files || [])].find(f => f.type.startsWith('image/')) || null;
+}
+
+async function shrinkImage(file) {
+  if (file.type === 'image/gif') return file;
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', 0.85));
+  return blob || file;
+}
+
+export async function uploadIdeaImage(supabase, file) {
+  const blob = await shrinkImage(file);
+  const type = blob.type || file.type;
+  const ext = { 'image/webp': 'webp', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif' }[type] || 'img';
+  const path = `${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage.from(IDEA_BUCKET).upload(path, blob, { contentType: type });
+  if (error) throw error;
+  return supabase.storage.from(IDEA_BUCKET).getPublicUrl(path).data.publicUrl;
+}
+
+// Path inside our bucket for images we host, or null for remote links.
+export function storedImagePath(imageUrl) {
+  return imageUrl?.split(`/storage/v1/object/public/${IDEA_BUCKET}/`)[1] || null;
+}
+
+export function removeIdeaImage(supabase, imageUrl) {
+  const path = storedImagePath(imageUrl);
+  if (path) supabase.storage.from(IDEA_BUCKET).remove([path]);
+}
+
+export function normaliseTag(tag) {
+  return tag.trim().toLowerCase().replace(/^#/, '').replace(/\s+/g, ' ').slice(0, 30);
+}

@@ -2,7 +2,10 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import AdminNavbar from '../../components/admin/AdminNavbar';
 import { supabase } from '../../lib/supabase';
 import { useCurrentMember } from '../../contexts/CurrentMemberContext';
-import { IDEA_STATUSES, IDEA_SOURCES, detectSource, normaliseUrl, extractUrl, titleFromUrl } from '../../lib/ideas';
+import {
+  IDEA_STATUSES, IDEA_SOURCES, detectSource, normaliseUrl, extractUrl, titleFromUrl,
+  firstImageFile, uploadIdeaImage, removeIdeaImage, normaliseTag,
+} from '../../lib/ideas';
 
 const mono = "'Space Mono', monospace";
 
@@ -64,17 +67,54 @@ function SourceBadge({ source }) {
   );
 }
 
+function TagChip({ tag, onRemove }) {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 3,
+      background: 'rgba(255,255,255,0.04)', color: '#888', border: '1px solid rgba(255,255,255,0.08)',
+      fontSize: 9, padding: '2px 6px', fontFamily: mono, letterSpacing: '0.04em',
+    }}>
+      #{tag}
+      {onRemove && (
+        <button onClick={onRemove} aria-label={`Remove ${tag}`} style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', padding: 0, display: 'flex' }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 11 }}>close</span>
+        </button>
+      )}
+    </span>
+  );
+}
+
+function VoteButton({ voters, myMemberId, membersById, onVote }) {
+  const mine = myMemberId && voters.includes(myMemberId);
+  const names = voters.map(id => membersById[id]?.name.split(' ')[0]).filter(Boolean);
+  return (
+    <button
+      onClick={e => { e.stopPropagation(); onVote(); }}
+      title={names.length ? `Liked by ${names.join(', ')}` : 'Vote for this idea'}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 3, padding: '2px 6px',
+        background: mine ? 'rgba(255,85,0,0.12)' : 'none',
+        border: `1px solid ${mine ? 'rgba(255,85,0,0.4)' : 'rgba(255,255,255,0.06)'}`,
+        color: mine ? '#ff5500' : '#555', cursor: 'pointer', fontFamily: mono, fontSize: 10,
+      }}
+    >
+      <span className="material-symbols-outlined" style={{ fontSize: 13, fontVariationSettings: mine ? "'FILL' 1" : undefined }}>thumb_up</span>
+      {voters.length > 0 && voters.length}
+    </button>
+  );
+}
+
 // ─── Idea Card ────────────────────────────────────────────────
 
-function IdeaCard({ idea, member, onClick, onDragStart, isDragTarget, onCardDragOver, onCardDrop }) {
+function IdeaCard({ idea, member, voters = [], myMemberId, membersById, onVote, onClick, onDragStart, isDragTarget, onCardDragOver, onCardDrop }) {
   if (idea.pending) {
     return (
       <div style={{ background: '#161616', border: '1px dashed rgba(255,85,0,0.35)', padding: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#ff5500', fontFamily: mono, fontSize: 10 }}>
           <span className="material-symbols-outlined" style={{ fontSize: 15, animation: 'spin 1s linear infinite' }}>progress_activity</span>
-          Fetching preview…
+          {idea.pendingLabel || 'Fetching preview…'}
         </div>
-        <div style={{ marginTop: 6, color: '#444', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{idea.url}</div>
+        {idea.url && <div style={{ marginTop: 6, color: '#444', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{idea.url}</div>}
       </div>
     );
   }
@@ -132,11 +172,18 @@ function IdeaCard({ idea, member, onClick, onDragStart, isDragTarget, onCardDrag
             {idea.notes}
           </div>
         )}
+        {idea.tags?.length > 0 && (
+          <div style={{ marginTop: 8, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {idea.tags.slice(0, 3).map(t => <TagChip key={t} tag={t} />)}
+            {idea.tags.length > 3 && <span style={{ color: '#444', fontSize: 9, fontFamily: mono, alignSelf: 'center' }}>+{idea.tags.length - 3}</span>}
+          </div>
+        )}
         <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
           <Avatar member={member} />
           <span style={{ flex: 1, minWidth: 0, color: '#555', fontSize: 10, fontFamily: mono, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {idea.author ? `by ${idea.author} · ` : ''}{timeAgo(idea.created_at)}
           </span>
+          <VoteButton voters={voters} myMemberId={myMemberId} membersById={membersById} onVote={() => onVote(idea.id)} />
           {idea.url && (
             <a
               href={idea.url}
@@ -159,7 +206,7 @@ function IdeaCard({ idea, member, onClick, onDragStart, isDragTarget, onCardDrag
 
 // ─── Column ───────────────────────────────────────────────────
 
-function IdeaColumn({ column, ideas, membersById, onCardClick, onDragStart, onDrop, fullWidth }) {
+function IdeaColumn({ column, ideas, membersById, votesByIdea, myMemberId, onVote, onCardClick, onDragStart, onDrop, fullWidth }) {
   const [dragOver, setDragOver] = useState(false);
   const [dragOverCardId, setDragOverCardId] = useState(null);
 
@@ -206,6 +253,10 @@ function IdeaColumn({ column, ideas, membersById, onCardClick, onDragStart, onDr
             key={idea.id}
             idea={idea}
             member={membersById[idea.added_by]}
+            voters={votesByIdea[idea.id]}
+            myMemberId={myMemberId}
+            membersById={membersById}
+            onVote={onVote}
             onClick={onCardClick}
             onDragStart={onDragStart}
             isDragTarget={dragOverCardId === idea.id}
@@ -234,16 +285,25 @@ function IdeaColumn({ column, ideas, membersById, onCardClick, onDragStart, onDr
 
 // ─── Idea Modal ───────────────────────────────────────────────
 
-function IdeaModal({ idea, membersById, onClose, onSave, onDelete }) {
+function IdeaModal({ idea, membersById, allTags, onClose, onSave, onDelete }) {
   const isMobile = useIsMobile();
   const [form, setForm] = useState({
     title: idea.title || '',
     notes: idea.notes || '',
     status: idea.status || 'inbox',
     author: idea.author || '',
-    image_url: idea.image_url || '',
+    url: idea.url || '',
+    image_url: idea.image_url || null,
+    tags: idea.tags || [],
   });
+  const [tagDraft, setTagDraft] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [imageError, setImageError] = useState(null);
+  const [dropping, setDropping] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const fileInput = useRef(null);
+  // Screenshots uploaded while the popup is open; removed again if not saved.
+  const uploaded = useRef([]);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const addedBy = membersById[idea.added_by];
 
@@ -257,19 +317,55 @@ function IdeaModal({ idea, membersById, onClose, onSave, onDelete }) {
     textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: 7,
   };
 
-  const save = () => {
-    if (!form.title.trim()) return;
-    onSave({ ...idea, ...form, title: form.title.trim(), image_url: form.image_url.trim() || null });
+  const attachImage = async file => {
+    if (!file) return;
+    setUploading(true);
+    setImageError(null);
+    try {
+      const url = await uploadIdeaImage(supabase, file);
+      uploaded.current.push(url);
+      set('image_url', url);
+    } catch (err) {
+      setImageError(`Upload failed: ${err.message}`);
+    }
+    setUploading(false);
   };
+
+  const addTag = raw => {
+    const tag = normaliseTag(raw);
+    if (tag && !form.tags.includes(tag)) set('tags', [...form.tags, tag]);
+    setTagDraft('');
+  };
+
+  const close = () => {
+    uploaded.current.forEach(url => removeIdeaImage(supabase, url));
+    onClose();
+  };
+
+  const save = () => {
+    if (!form.title.trim() || uploading) return;
+    const pendingTag = normaliseTag(tagDraft);
+    const tags = pendingTag && !form.tags.includes(pendingTag) ? [...form.tags, pendingTag] : form.tags;
+    // Keep only the screenshot that ended up on the idea.
+    uploaded.current.filter(url => url !== form.image_url).forEach(url => removeIdeaImage(supabase, url));
+    uploaded.current = [];
+    onSave({ ...idea, ...form, tags, title: form.title.trim(), url: extractUrl(form.url) || null });
+  };
+
+  const suggestions = allTags.filter(t => !form.tags.includes(t));
 
   return (
     <div
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9998, display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? 0 : 24 }}
-      onClick={onClose}
+      onClick={close}
     >
       <div
-        style={{ background: '#111', border: '1px solid rgba(255,255,255,0.1)', width: '100%', maxWidth: isMobile ? '100%' : 620, maxHeight: isMobile ? '95vh' : '90vh', borderRadius: isMobile ? '12px 12px 0 0' : 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+        style={{ background: '#111', border: '1px solid rgba(255,255,255,0.1)', width: '100%', maxWidth: isMobile ? '100%' : 640, maxHeight: isMobile ? '95vh' : '90vh', borderRadius: isMobile ? '12px 12px 0 0' : 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
         onClick={e => e.stopPropagation()}
+        onPaste={e => {
+          const file = firstImageFile(e.clipboardData);
+          if (file) { e.preventDefault(); attachImage(file); }
+        }}
       >
         {/* Header */}
         <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
@@ -287,22 +383,59 @@ function IdeaModal({ idea, membersById, onClose, onSave, onDelete }) {
               <span className="material-symbols-outlined" style={{ fontSize: 13 }}>delete</span>
               {confirmDelete ? 'Confirm' : 'Delete'}
             </button>
-            <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', display: 'flex' }}>
+            <button onClick={close} style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', display: 'flex' }}>
               <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
             </button>
           </div>
         </div>
 
         {/* Body */}
-        <div style={{ padding: 18, overflowY: 'auto', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '220px 1fr', gap: 18 }}>
+        <div style={{ padding: 18, overflowY: 'auto', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '230px 1fr', gap: 18 }}>
           <div>
-            <div style={{ width: '100%', aspectRatio: isMobile ? '16 / 9' : '4 / 3', maxHeight: isMobile ? 180 : undefined, background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+            <div
+              onDragOver={e => { e.preventDefault(); setDropping(true); }}
+              onDragLeave={() => setDropping(false)}
+              onDrop={e => { e.preventDefault(); setDropping(false); attachImage(firstImageFile(e.dataTransfer)); }}
+              onClick={() => !form.image_url && fileInput.current?.click()}
+              style={{
+                position: 'relative', width: '100%', aspectRatio: isMobile ? '16 / 9' : '4 / 3', maxHeight: isMobile ? 180 : undefined,
+                background: '#0a0a0a', border: `1px ${dropping ? 'dashed #ff5500' : 'solid rgba(255,255,255,0.06)'}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+                cursor: form.image_url ? 'default' : 'pointer',
+              }}
+            >
               {form.image_url ? (
-                <img src={form.image_url} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <img src={form.image_url} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
               ) : (
-                <span className="material-symbols-outlined" style={{ fontSize: 40, color: '#2a2a2a' }}>lightbulb</span>
+                <div style={{ textAlign: 'center', color: '#444', fontFamily: mono, fontSize: 9, lineHeight: 1.6, padding: 12, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 30, color: '#333', display: 'block', marginBottom: 4 }}>add_photo_alternate</span>
+                  {isMobile ? 'Tap to add a screenshot' : 'Paste, drop or click to add a screenshot'}
+                </div>
+              )}
+              {uploading && (
+                <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ff5500' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 24, animation: 'spin 1s linear infinite' }}>progress_activity</span>
+                </div>
+              )}
+              {form.image_url && !uploading && (
+                <div style={{ position: 'absolute', top: 6, right: 6, display: 'flex', gap: 4 }}>
+                  <button onClick={e => { e.stopPropagation(); fileInput.current?.click(); }} title="Replace image" style={imageAction}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 15 }}>photo_camera</span>
+                  </button>
+                  <button onClick={e => { e.stopPropagation(); set('image_url', null); }} title="Remove image" style={imageAction}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 15 }}>close</span>
+                  </button>
+                </div>
               )}
             </div>
+            <input
+              ref={fileInput}
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={e => { attachImage(e.target.files?.[0]); e.target.value = ''; }}
+            />
+            {imageError && <div style={{ marginTop: 6, color: '#ef4444', fontSize: 10, fontFamily: mono }}>{imageError}</div>}
             {idea.url && (
               <a
                 href={idea.url}
@@ -334,31 +467,56 @@ function IdeaModal({ idea, membersById, onClose, onSave, onDelete }) {
               </div>
             </div>
             <div>
+              <label style={fieldLabel}>Tags</label>
+              <div style={{ ...input, display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center', padding: '6px 8px' }}>
+                {form.tags.map(t => <TagChip key={t} tag={t} onRemove={() => set('tags', form.tags.filter(x => x !== t))} />)}
+                <input
+                  value={tagDraft}
+                  list="idea-tag-suggestions"
+                  onChange={e => {
+                    const v = e.target.value;
+                    // Picking a suggestion or typing a comma commits the tag.
+                    if (v.endsWith(',') || suggestions.includes(v)) addTag(v.replace(/,$/, ''));
+                    else setTagDraft(v);
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') { e.preventDefault(); addTag(tagDraft); }
+                    if (e.key === 'Backspace' && !tagDraft && form.tags.length) set('tags', form.tags.slice(0, -1));
+                  }}
+                  placeholder={form.tags.length ? '' : 'desk, gift, eid…'}
+                  style={{ flex: 1, minWidth: 80, background: 'none', border: 'none', outline: 'none', color: '#fff', fontSize: 12, fontFamily: "'DM Sans', sans-serif", padding: '2px 0' }}
+                />
+                <datalist id="idea-tag-suggestions">
+                  {suggestions.map(t => <option key={t} value={t} />)}
+                </datalist>
+              </div>
+            </div>
+            <div>
               <label style={fieldLabel}>Notes</label>
               <textarea
                 value={form.notes}
                 onChange={e => set('notes', e.target.value)}
                 placeholder="Why it could sell, colours, size, print time…"
-                rows={4}
+                rows={3}
                 style={{ ...input, resize: 'vertical' }}
               />
             </div>
             <div>
-              <label style={fieldLabel}>Image URL</label>
-              <input value={form.image_url} onChange={e => set('image_url', e.target.value)} placeholder="Paste an image link if the preview missed it" style={{ ...input, fontSize: 11 }} />
+              <label style={fieldLabel}>Link</label>
+              <input value={form.url} onChange={e => set('url', e.target.value)} placeholder="https://…" style={{ ...input, fontSize: 11 }} />
             </div>
           </div>
         </div>
 
         {/* Footer */}
         <div style={{ padding: '12px 18px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button onClick={onClose} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', color: '#888', padding: '8px 16px', cursor: 'pointer', fontFamily: mono, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          <button onClick={close} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', color: '#888', padding: '8px 16px', cursor: 'pointer', fontFamily: mono, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
             Cancel
           </button>
           <button
             onClick={save}
-            disabled={!form.title.trim()}
-            style={{ background: '#ff5500', border: 'none', color: '#fff', padding: '8px 18px', cursor: form.title.trim() ? 'pointer' : 'not-allowed', opacity: form.title.trim() ? 1 : 0.4, fontFamily: mono, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}
+            disabled={!form.title.trim() || uploading}
+            style={{ background: '#ff5500', border: 'none', color: '#fff', padding: '8px 18px', cursor: form.title.trim() && !uploading ? 'pointer' : 'not-allowed', opacity: form.title.trim() && !uploading ? 1 : 0.4, fontFamily: mono, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}
           >
             Save
           </button>
@@ -368,10 +526,19 @@ function IdeaModal({ idea, membersById, onClose, onSave, onDelete }) {
   );
 }
 
+const imageAction = {
+  background: 'rgba(0,0,0,0.75)', border: '1px solid rgba(255,255,255,0.15)', color: '#ddd',
+  cursor: 'pointer', padding: 4, display: 'flex',
+};
+
+const filterSelect = { background: '#111', border: '1px solid rgba(255,255,255,0.07)', color: '#777', fontSize: 10, padding: '6px 8px', outline: 'none', fontFamily: mono, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em', flexShrink: 0 };
+
 // ─── Capture Bar ──────────────────────────────────────────────
 
-function CaptureBar({ onCapture }) {
+function CaptureBar({ onCapture, onCaptureImage }) {
   const [value, setValue] = useState('');
+  const [dropping, setDropping] = useState(false);
+  const fileInput = useRef(null);
 
   const submit = text => {
     const url = extractUrl(text);
@@ -382,23 +549,48 @@ function CaptureBar({ onCapture }) {
   };
 
   return (
-    <div style={{ display: 'flex', gap: 8 }}>
+    <div
+      style={{ display: 'flex', gap: 8 }}
+      onDragOver={e => { if ([...e.dataTransfer.types].includes('Files')) { e.preventDefault(); setDropping(true); } }}
+      onDragLeave={() => setDropping(false)}
+      onDrop={e => {
+        const file = firstImageFile(e.dataTransfer);
+        setDropping(false);
+        if (file) { e.preventDefault(); onCaptureImage(file); }
+      }}
+    >
       <div style={{ position: 'relative', flex: 1 }}>
         <span className="material-symbols-outlined" style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', fontSize: 17, color: '#ff5500', pointerEvents: 'none' }}>add_link</span>
         <input
           value={value}
           onChange={e => setValue(e.target.value)}
           onPaste={e => {
-            // Pasting a link saves it straight away — no extra click.
+            // Pasting a link or a screenshot saves it straight away — no extra click.
+            const file = firstImageFile(e.clipboardData);
+            if (file) { e.preventDefault(); onCaptureImage(file); return; }
             if (submit(e.clipboardData.getData('text'))) e.preventDefault();
           }}
           onKeyDown={e => { if (e.key === 'Enter') submit(value); }}
-          placeholder="Paste a MakerWorld, Instagram or Pinterest link…"
-          style={{ width: '100%', boxSizing: 'border-box', background: '#111', border: '1px solid rgba(255,85,0,0.25)', color: '#e5e2e1', fontSize: 13, padding: '11px 12px 11px 36px', outline: 'none', fontFamily: "'DM Sans', sans-serif" }}
+          placeholder={dropping ? 'Drop the screenshot to save it' : 'Paste a link or a screenshot…'}
+          style={{ width: '100%', boxSizing: 'border-box', background: dropping ? 'rgba(255,85,0,0.06)' : '#111', border: `1px ${dropping ? 'dashed' : 'solid'} rgba(255,85,0,${dropping ? 0.7 : 0.25})`, color: '#e5e2e1', fontSize: 13, padding: '11px 12px 11px 36px', outline: 'none', fontFamily: "'DM Sans', sans-serif" }}
           onFocus={e => e.currentTarget.style.borderColor = 'rgba(255,85,0,0.6)'}
           onBlur={e => e.currentTarget.style.borderColor = 'rgba(255,85,0,0.25)'}
         />
       </div>
+      <button
+        onClick={() => fileInput.current?.click()}
+        title="Add a screenshot"
+        style={{ display: 'flex', alignItems: 'center', background: 'none', border: '1px solid rgba(255,85,0,0.25)', color: '#ff5500', padding: '0 12px', cursor: 'pointer' }}
+      >
+        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>add_photo_alternate</span>
+      </button>
+      <input
+        ref={fileInput}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={e => { const f = e.target.files?.[0]; if (f) onCaptureImage(f); e.target.value = ''; }}
+      />
       <button
         onClick={() => submit(value)}
         disabled={!extractUrl(value)}
@@ -422,14 +614,18 @@ export default function Ideas() {
   const [search,    setSearch]    = useState('');
   const [activeCol, setActiveCol] = useState('inbox');
   const [toast,     setToast]     = useState(null);
+  const [votes,     setVotes]     = useState([]);
+  const [filterSource, setFilterSource] = useState('');
+  const [filterTag,    setFilterTag]    = useState('');
+  const [sortBy,       setSortBy]       = useState('manual');
   const [weekAgo] = useState(() => new Date(Date.now() - 7 * 86400000));
   const dragId = useRef(null);
   const toastTimer = useRef(null);
 
-  const showToast = (message, tone = 'info') => {
+  const showToast = (message, tone = 'info', action = null) => {
     clearTimeout(toastTimer.current);
-    setToast({ message, tone });
-    toastTimer.current = setTimeout(() => setToast(null), 4000);
+    setToast({ message, tone, action });
+    toastTimer.current = setTimeout(() => setToast(null), action ? 7000 : 4000);
   };
 
   // ── Load ──
@@ -437,10 +633,12 @@ export default function Ideas() {
     Promise.all([
       supabase.from('ideas').select('*').order('position').order('created_at', { ascending: false }),
       supabase.from('members').select('id, name, color'),
-    ]).then(([i, m]) => {
+      supabase.from('idea_votes').select('idea_id, member_id'),
+    ]).then(([i, m, v]) => {
       if (i.error) showToast(`Couldn't load ideas: ${i.error.message}`, 'error');
       setIdeas(i.data || []);
       setMembers(m.data || []);
+      setVotes(v.data || []);
       setLoading(false);
     });
   }, []);
@@ -500,18 +698,103 @@ export default function Ideas() {
     }
 
     setIdeas(is => is.map(i => i.id === tempId ? data : i));
-    if (!preview?.title || !preview?.image_url) {
-      showToast('Saved — the site hid its preview, so tap the card to add a title or image.');
+    if (!preview?.image_url) {
+      showToast('Saved, but the site hid its picture.', 'info', { label: 'Add screenshot', run: () => setModalIdea(data) });
+    }
+  };
+
+  // A screenshot with no link: upload it, save the idea, then open it so the
+  // title, tags and link can be filled in while it's fresh.
+  const handleCaptureImage = async (file, status = 'inbox') => {
+    const tempId = `pending-${Date.now()}`;
+    setIdeas(is => [{ id: tempId, pending: true, pendingLabel: 'Uploading screenshot…', status }, ...is]);
+    setActiveCol(status);
+
+    let imageUrl;
+    try {
+      imageUrl = await uploadIdeaImage(supabase, file);
+    } catch (err) {
+      setIdeas(is => is.filter(i => i.id !== tempId));
+      showToast(`Couldn't upload: ${err.message}`, 'error');
+      return;
+    }
+
+    const minPos = ideas.filter(i => i.status === status && !i.pending).reduce((m, i) => Math.min(m, i.position ?? 0), 0);
+    const { data, error } = await supabase.from('ideas').insert({
+      source: 'other',
+      title: 'Screenshot idea',
+      image_url: imageUrl,
+      status,
+      position: minPos - 1,
+      added_by: member?.id ?? null,
+    }).select().single();
+
+    if (error) {
+      removeIdeaImage(supabase, imageUrl);
+      setIdeas(is => is.filter(i => i.id !== tempId));
+      showToast(`Couldn't save: ${error.message}`, 'error');
+      return;
+    }
+    setIdeas(is => is.map(i => i.id === tempId ? data : i));
+    setModalIdea(data);
+  };
+
+  // Paste a screenshot anywhere on the page (outside text fields and the popup).
+  const captureImageRef = useRef(handleCaptureImage);
+  useEffect(() => { captureImageRef.current = handleCaptureImage; });
+  useEffect(() => {
+    if (modalIdea) return;
+    const onPaste = e => {
+      if (e.target.closest?.('input, textarea, [contenteditable]')) return;
+      const file = firstImageFile(e.clipboardData);
+      if (file) { e.preventDefault(); captureImageRef.current(file); }
+    };
+    document.addEventListener('paste', onPaste);
+    return () => document.removeEventListener('paste', onPaste);
+  }, [modalIdea]);
+
+  // ── Votes ──
+  const handleVote = async ideaId => {
+    if (!member) { showToast('Your login isn\'t linked to a team member, so you can\'t vote.', 'error'); return; }
+    const mine = votes.some(v => v.idea_id === ideaId && v.member_id === member.id);
+    setVotes(vs => mine
+      ? vs.filter(v => !(v.idea_id === ideaId && v.member_id === member.id))
+      : [...vs, { idea_id: ideaId, member_id: member.id }]);
+    const { error } = mine
+      ? await supabase.from('idea_votes').delete().eq('idea_id', ideaId).eq('member_id', member.id)
+      : await supabase.from('idea_votes').insert({ idea_id: ideaId, member_id: member.id });
+    if (error) {
+      showToast(`Couldn't save vote: ${error.message}`, 'error');
+      setVotes(vs => mine
+        ? [...vs, { idea_id: ideaId, member_id: member.id }]
+        : vs.filter(v => !(v.idea_id === ideaId && v.member_id === member.id)));
     }
   };
 
   // ── CRUD ──
   const handleSave = async idea => {
+    const before = ideas.find(i => i.id === idea.id);
+    const linkChanged = (idea.url || null) !== (before?.url || null);
     const { data, error } = await supabase.from('ideas').update({
       title: idea.title, notes: idea.notes || null, status: idea.status,
-      author: idea.author || null, image_url: idea.image_url,
+      author: idea.author || null, image_url: idea.image_url || null,
+      tags: idea.tags,
+      ...(linkChanged && {
+        url: idea.url,
+        url_key: idea.url ? normaliseUrl(idea.url) : null,
+        source: idea.url ? detectSource(idea.url) : 'other',
+      }),
     }).eq('id', idea.id).select().single();
-    if (error) { showToast(`Couldn't save: ${error.message}`, 'error'); return; }
+    if (error) {
+      if (error.code === '23505') {
+        const existing = ideas.find(i => i.url_key === normaliseUrl(idea.url));
+        showToast(existing ? `Another idea already has that link: "${existing.title}".` : 'Another idea already has that link.', 'error');
+      } else {
+        showToast(`Couldn't save: ${error.message}`, 'error');
+      }
+      return;
+    }
+    if (before?.image_url && before.image_url !== data.image_url) removeIdeaImage(supabase, before.image_url);
     setIdeas(is => is.map(i => i.id === data.id ? data : i));
     setModalIdea(null);
   };
@@ -519,10 +802,9 @@ export default function Ideas() {
   const handleDelete = async id => {
     const { error } = await supabase.from('ideas').delete().eq('id', id);
     if (error) { showToast(`Couldn't delete: ${error.message}`, 'error'); return; }
-    // Thumbnails copied by idea-preview live in our bucket; remove them too.
-    const image = ideas.find(i => i.id === id)?.image_url;
-    const stored = image?.split('/storage/v1/object/public/idea-images/')[1];
-    if (stored) supabase.storage.from('idea-images').remove([stored]);
+    // Thumbnails and screenshots live in our bucket; remove them too.
+    removeIdeaImage(supabase, ideas.find(i => i.id === id)?.image_url);
+    setVotes(vs => vs.filter(v => v.idea_id !== id));
     setIdeas(is => is.filter(i => i.id !== id));
     setModalIdea(null);
   };
@@ -536,7 +818,12 @@ export default function Ideas() {
   const handleDrop = async (e, newStatus, targetCardId = null) => {
     const id = dragId.current;
     dragId.current = null;
-    if (!id) return;
+    if (!id) {
+      // A screenshot dragged in from the desktop lands in the column it's dropped on.
+      const file = firstImageFile(e.dataTransfer);
+      if (file) handleCaptureImage(file, newStatus);
+      return;
+    }
     const idea = ideas.find(i => i.id === id);
     if (!idea) return;
 
@@ -546,7 +833,8 @@ export default function Ideas() {
       return;
     }
 
-    if (!targetCardId || targetCardId === id) return;
+    // Reordering only makes sense in board order; sorted views would just snap back.
+    if (!targetCardId || targetCardId === id || sortBy !== 'manual') return;
 
     const col = ideas.filter(i => i.status === newStatus && !i.pending);
     const fromIdx = col.findIndex(i => i.id === id);
@@ -568,17 +856,39 @@ export default function Ideas() {
   };
 
   // ── Derived ──
+  const votesByIdea = useMemo(() => {
+    const out = {};
+    for (const v of votes) (out[v.idea_id] ||= []).push(v.member_id);
+    return out;
+  }, [votes]);
+
+  // Most-used first, so the suggestions and filter list lead with the house tags.
+  const allTags = useMemo(() => {
+    const counts = {};
+    for (const i of ideas) for (const t of i.tags || []) counts[t] = (counts[t] || 0) + 1;
+    return Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b));
+  }, [ideas]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return ideas;
-    return ideas.filter(i => i.pending || [i.title, i.notes, i.author, i.url].some(v => v?.toLowerCase().includes(q)));
-  }, [ideas, search]);
+    return ideas.filter(i => i.pending || (
+      (!filterSource || i.source === filterSource) &&
+      (!filterTag || (i.tags || []).includes(filterTag)) &&
+      (!q || [i.title, i.notes, i.author, i.url, ...(i.tags || [])].some(v => v?.toLowerCase().includes(q)))
+    ));
+  }, [ideas, search, filterSource, filterTag]);
 
   const byCol = useMemo(() => {
     const out = Object.fromEntries(IDEA_STATUSES.map(s => [s.id, []]));
     for (const i of filtered) (out[i.status] || out.inbox).push(i);
+    if (sortBy !== 'manual') {
+      const score = i => i.pending ? Infinity : sortBy === 'votes' ? (votesByIdea[i.id]?.length || 0) : new Date(i.created_at).getTime();
+      for (const col of Object.values(out)) col.sort((a, b) => score(b) - score(a));
+    }
     return out;
-  }, [filtered]);
+  }, [filtered, sortBy, votesByIdea]);
+
+  const hasFilters = filterSource || filterTag || search;
 
   const thisWeek = ideas.filter(i => !i.pending && new Date(i.created_at) > weekAgo).length;
   const total = ideas.filter(i => !i.pending).length;
@@ -609,7 +919,31 @@ export default function Ideas() {
               />
             </div>
           </div>
-          <CaptureBar onCapture={handleCapture} />
+          <CaptureBar onCapture={handleCapture} onCaptureImage={file => handleCaptureImage(file)} />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', overflowX: 'auto', scrollbarWidth: 'none' }}>
+            <select value={filterSource} onChange={e => setFilterSource(e.target.value)} style={{ ...filterSelect, color: filterSource ? '#ff5500' : '#777' }}>
+              <option value="">All sources</option>
+              {Object.entries(IDEA_SOURCES).map(([id, src]) => <option key={id} value={id}>{src.label}</option>)}
+            </select>
+            <select value={filterTag} onChange={e => setFilterTag(e.target.value)} style={{ ...filterSelect, color: filterTag ? '#ff5500' : '#777' }}>
+              <option value="">All tags</option>
+              {allTags.map(t => <option key={t} value={t}>#{t}</option>)}
+            </select>
+            <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={filterSelect}>
+              <option value="manual">Sort: board order</option>
+              <option value="votes">Sort: most votes</option>
+              <option value="newest">Sort: newest</option>
+            </select>
+            {hasFilters && (
+              <button
+                onClick={() => { setFilterSource(''); setFilterTag(''); setSearch(''); }}
+                style={{ ...filterSelect, display: 'flex', alignItems: 'center', gap: 4 }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 13 }}>filter_alt_off</span>
+                Clear
+              </button>
+            )}
+          </div>
         </div>
 
         {/* ── Mobile column tab bar ── */}
@@ -649,6 +983,9 @@ export default function Ideas() {
               column={IDEA_STATUSES.find(c => c.id === activeCol) || IDEA_STATUSES[0]}
               ideas={byCol[activeCol] || []}
               membersById={membersById}
+              votesByIdea={votesByIdea}
+              myMemberId={member?.id}
+              onVote={handleVote}
               onCardClick={setModalIdea}
               onDragStart={handleDragStart}
               onDrop={handleDrop}
@@ -662,6 +999,9 @@ export default function Ideas() {
                   column={col}
                   ideas={byCol[col.id] || []}
                   membersById={membersById}
+                  votesByIdea={votesByIdea}
+                  myMemberId={member?.id}
+                  onVote={handleVote}
                   onCardClick={setModalIdea}
                   onDragStart={handleDragStart}
                   onDrop={handleDrop}
@@ -677,6 +1017,7 @@ export default function Ideas() {
           key={modalIdea.id}
           idea={modalIdea}
           membersById={membersById}
+          allTags={allTags}
           onClose={() => setModalIdea(null)}
           onSave={handleSave}
           onDelete={handleDelete}
@@ -693,9 +1034,18 @@ export default function Ideas() {
             color: toast.tone === 'error' ? '#ef4444' : '#e5e2e1',
             padding: '10px 14px', fontSize: 12, fontFamily: "'DM Sans', sans-serif",
             boxShadow: '0 8px 30px rgba(0,0,0,0.6)',
+            display: 'flex', alignItems: 'center', gap: 12,
           }}
         >
           {toast.message}
+          {toast.action && (
+            <button
+              onClick={() => { toast.action.run(); setToast(null); }}
+              style={{ background: 'none', border: '1px solid rgba(255,85,0,0.5)', color: '#ff5500', cursor: 'pointer', padding: '4px 10px', fontFamily: mono, fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}
+            >
+              {toast.action.label}
+            </button>
+          )}
         </div>
       )}
     </div>

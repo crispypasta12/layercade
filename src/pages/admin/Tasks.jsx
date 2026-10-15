@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import AdminNavbar from '../../components/admin/AdminNavbar';
 import { supabase } from '../../lib/supabase';
+import { pageTagline } from '../../lib/quips';
 import { AnimatePresence } from 'framer-motion';
 
 // ─── Constants ────────────────────────────────────────────────
@@ -1075,6 +1076,9 @@ export default function Tasks() {
               <p style={{ margin: '2px 0 0', fontFamily: "'Space Mono', monospace", fontSize: 9, color: '#444' }}>
                 {tasks.length} total · {inProgress} in progress{overdue > 0 ? ' · ' : ''}
                 {overdue > 0 && <span style={{ color: '#ef4444' }}>{overdue} overdue</span>}
+              </p>
+              <p style={{ margin: '3px 0 0', fontFamily: "'Space Mono', monospace", fontSize: 9, color: '#333', fontStyle: 'italic' }}>
+                {pageTagline('/admin/tasks')}
               </p>
             </div>
 

@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import AdminNavbar from '../../components/admin/AdminNavbar';
+import PageTagline from '../../components/admin/PageTagline';
 import { supabase } from '../../lib/supabase';
 import { markPricesChanged } from '../../lib/costing';
 
@@ -907,6 +908,7 @@ export default function CostCalculator() {
             <p className="font-technical text-xs text-stone-500 uppercase tracking-widest mt-1">
               Pricing & profitability tool
             </p>
+            <PageTagline />
           </div>
           <button
             onClick={() => setShowSettings((v) => !v)}

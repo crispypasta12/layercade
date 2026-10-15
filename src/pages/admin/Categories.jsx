@@ -17,6 +17,8 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { supabase } from '../../lib/supabase';
 import AdminNavbar from '../../components/admin/AdminNavbar';
+import PageTagline from '../../components/admin/PageTagline';
+import { emptyQuip } from '../../lib/quips';
 import Toast from '../../components/Toast';
 
 const CLOUD_NAME    = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
@@ -823,6 +825,7 @@ export default function AdminCategories() {
             >
               Categories
             </h1>
+            <PageTagline />
             <p className="mt-1 font-technical text-[10px] text-stone-500 uppercase tracking-widest">
               {parentCount} parent{parentCount !== 1 ? 's' : ''} · {subCount} sub-{subCount !== 1 ? 'categories' : 'category'}
               {saving && (
@@ -884,7 +887,8 @@ export default function AdminCategories() {
           </div>
         ) : categories.length === 0 ? (
           <div className="text-center py-24 border border-white/5 bg-[#111111]">
-            <p className="font-headline text-4xl text-white mb-4">NO CATEGORIES YET</p>
+            <p className="font-headline text-4xl text-white mb-2">NO CATEGORIES YET</p>
+            <p className="font-body text-sm text-stone-600 mb-6">{emptyQuip('categories', false, 0)}</p>
             <button
               onClick={() => openAdd(null)}
               className="clip-parallelogram bg-[#ff5500] text-white font-technical text-xs

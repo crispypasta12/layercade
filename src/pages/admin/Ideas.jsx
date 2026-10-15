@@ -7,6 +7,7 @@ import IdeaImportModal from '../../components/admin/IdeaImportModal';
 import PhoneSaveHelp from '../../components/admin/PhoneSaveHelp';
 import { supabase } from '../../lib/supabase';
 import { useCurrentMember } from '../../contexts/CurrentMemberContext';
+import { pageTagline } from '../../lib/quips';
 import {
   IDEA_STATUSES, IDEA_SOURCES, detectSource, normaliseUrl, extractUrl, titleFromUrl,
   firstImageFile, uploadIdeaImage, removeIdeaImage, normaliseTag,
@@ -1343,6 +1344,9 @@ export default function Ideas() {
                 {total} saved · {thisWeek} this week
                 {soldFromIdeas > 0 && <span style={{ color: '#22c55e' }}> · {soldFromIdeas} sold from ideas</span>}
                 {enrich && <span style={{ color: '#ff5500' }}> · fetching previews {enrich.done}/{enrich.total}</span>}
+              </p>
+              <p style={{ margin: '3px 0 0', fontFamily: mono, fontSize: 9, color: '#333', fontStyle: 'italic' }}>
+                {pageTagline('/admin/ideas')}
               </p>
             </div>
             <button onClick={() => setShowPhoneHelp(true)} title="Save from your phone" style={headerIconButton}>

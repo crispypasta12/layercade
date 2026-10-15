@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
 import AdminNavbar from '../../components/admin/AdminNavbar';
+import PageTagline from '../../components/admin/PageTagline';
+import { emptyQuip } from '../../lib/quips';
 import Toast from '../../components/Toast';
 import {
   STATUSES, STATUS_BY_VALUE, AMS_SLOTS, LOCATIONS, BRANDS, MATERIALS, FINISHES,
@@ -910,6 +912,7 @@ export default function AdminInventory() {
             <p className="mt-1 font-technical text-[10px] text-stone-500 uppercase tracking-widest">
               {loading ? 'Loading…' : `${stats.total} spools · ${formatKg(stats.grams)} on hand`}
             </p>
+            <PageTagline />
           </div>
           <button
             onClick={() => setEditing(null)}
@@ -1013,8 +1016,11 @@ export default function AdminInventory() {
                 <p className="text-4xl text-white mb-3" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
                   {spools.length === 0 ? 'No spools yet' : 'Nothing matches'}
                 </p>
-                <p className="font-body text-stone-500 text-sm mb-6">
+                <p className="font-body text-stone-500 text-sm mb-2">
                   {spools.length === 0 ? 'Add your first spool to start tracking filament.' : 'Try a different search or filter.'}
+                </p>
+                <p className="font-body text-sm text-stone-600 mb-6">
+                  {emptyQuip('inventory', spools.length > 0, spools.length)}
                 </p>
                 {filtersActive && (
                   <button onClick={clearFilters} className="font-technical text-xs uppercase tracking-widest text-[#ff5500] hover:text-white">

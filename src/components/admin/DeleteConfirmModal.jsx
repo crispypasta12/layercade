@@ -1,25 +1,43 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { DESTRUCTIVE, quip } from '../../lib/quips';
 
 /**
- * Delete confirmation modal.
+ * Confirmation for anything irreversible.
+ *
  * Props:
- *   product   — the product to delete (or null = hidden)
- *   onClose   — called on cancel / backdrop click
- *   onConfirm — called when the user clicks Delete
+ *   open         — show it
+ *   title        — heading, e.g. "Delete Review?"
+ *   name         — the thing's name, emphasised inside the sentence (optional)
+ *   body         — override the whole sentence (optional)
+ *   confirmLabel — the button's text. ALWAYS literal: "Delete expense", never
+ *                  a joke. Whatever the body says, nobody should have to parse
+ *                  a punchline to know what the red button does.
+ *   onClose, onConfirm
  */
-export default function DeleteConfirmModal({ product, onClose, onConfirm }) {
+export default function DeleteConfirmModal({
+  open,
+  title = 'Delete?',
+  name,
+  body,
+  confirmLabel = 'Delete',
+  onClose,
+  onConfirm,
+}) {
   /* ESC key closes */
   useEffect(() => {
-    if (!product) return;
+    if (!open) return;
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [product, onClose]);
+  }, [open, onClose]);
+
+  // Seeded on the title so reopening the same dialog shows the same line.
+  const aside = useMemo(() => quip(DESTRUCTIVE, title), [title]);
 
   return (
     <AnimatePresence>
-      {product && (
+      {open && (
         /* Backdrop */
         <motion.div
           className="fixed inset-0 z-[150] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
@@ -31,6 +49,8 @@ export default function DeleteConfirmModal({ product, onClose, onConfirm }) {
         >
           {/* Panel */}
           <motion.div
+            role="dialog"
+            aria-modal="true"
             className="w-full max-w-md bg-[#111111] border border-white/10 p-8"
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -38,7 +58,6 @@ export default function DeleteConfirmModal({ product, onClose, onConfirm }) {
             transition={{ duration: 0.2, ease: 'easeOut' }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Warning icon */}
             <div className="flex flex-col items-center text-center gap-4">
               <span
                 className="material-symbols-outlined text-red-500"
@@ -51,13 +70,21 @@ export default function DeleteConfirmModal({ product, onClose, onConfirm }) {
                 className="text-white uppercase"
                 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.75rem' }}
               >
-                Delete Product?
+                {title}
               </h2>
 
               <p className="font-body text-white/60 text-sm leading-relaxed">
-                Are you sure you want to delete{' '}
-                <span className="text-white font-medium">{product.name}</span>?{' '}
-                This action cannot be undone.
+                {body ?? (
+                  <>
+                    Are you sure you want to delete
+                    {name ? <> <span className="text-white font-medium">{name}</span></> : ' this'}
+                    ? This action cannot be undone.
+                  </>
+                )}
+              </p>
+
+              <p className="font-technical text-[10px] text-stone-600 tracking-wide italic">
+                {aside}
               </p>
             </div>
 
@@ -75,7 +102,7 @@ export default function DeleteConfirmModal({ product, onClose, onConfirm }) {
                 className="flex-1 py-3 font-technical text-xs uppercase tracking-widest
                            bg-red-500 text-white hover:bg-red-600 transition-colors"
               >
-                Delete
+                {confirmLabel}
               </button>
             </div>
           </motion.div>

@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import AdminNavbar from '../../components/admin/AdminNavbar';
+import PageTagline from '../../components/admin/PageTagline';
+import DeleteConfirmModal from '../../components/admin/DeleteConfirmModal';
+import { emptyQuip } from '../../lib/quips';
 
 function avatarInitials(name) {
   return name.trim().split(/\s+/).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
@@ -34,6 +37,7 @@ export default function AdminReviews() {
   const [loading, setLoading] = useState(true);
   const [counts, setCounts]   = useState({ pending: 0, approved: 0, rejected: 0 });
   const [lightbox, setLightbox] = useState(null);
+  const [deleting, setDeleting] = useState(null);
 
   const fetchReviews = async () => {
     setLoading(true);
@@ -70,8 +74,9 @@ export default function AdminReviews() {
     fetchCounts();
   };
 
-  const deleteReview = async (id) => {
-    if (!window.confirm('Delete this review permanently?')) return;
+  const deleteReview = async () => {
+    const id = deleting.id;
+    setDeleting(null);
     await supabase.from('reviews').delete().eq('id', id);
     setReviews((prev) => prev.filter((r) => r.id !== id));
     fetchCounts();
@@ -89,6 +94,7 @@ export default function AdminReviews() {
         <div className="mb-6">
           <p className="font-technical text-[10px] uppercase tracking-[0.3em] text-[#ff5500]">Admin</p>
           <h1 className="mt-1 font-headline text-5xl text-white">Reviews</h1>
+          <PageTagline />
         </div>
 
         {/* Tabs */}
@@ -123,8 +129,8 @@ export default function AdminReviews() {
             <span className="material-symbols-outlined text-stone-700 text-5xl" style={{ fontVariationSettings: "'FILL' 0" }}>
               rate_review
             </span>
-            <p className="mt-3 font-technical text-[10px] uppercase tracking-[0.2em] text-stone-600">
-              No {tab} reviews
+            <p className="mt-3 font-body text-sm text-stone-600">
+              {emptyQuip('reviews', tab !== 'pending', tab)}
             </p>
           </div>
         ) : (
@@ -229,7 +235,7 @@ export default function AdminReviews() {
                   )}
                   <button
                     type="button"
-                    onClick={() => deleteReview(review.id)}
+                    onClick={() => setDeleting(review)}
                     className="ml-auto flex items-center gap-1.5 border border-red-900/40 bg-red-950/10 px-4 py-1.5
                                font-technical text-[10px] uppercase tracking-[0.15em] text-red-500
                                hover:bg-red-950/30 transition-colors"
@@ -243,6 +249,15 @@ export default function AdminReviews() {
           </div>
         )}
       </main>
+
+      <DeleteConfirmModal
+        open={!!deleting}
+        title="Delete Review?"
+        name={deleting?.reviewer_name}
+        confirmLabel="Delete review"
+        onClose={() => setDeleting(null)}
+        onConfirm={deleteReview}
+      />
 
       {/* Lightbox */}
       {lightbox && (

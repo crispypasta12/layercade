@@ -1,7 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import AdminNavbar from '../../components/admin/AdminNavbar';
+import PageTagline from '../../components/admin/PageTagline';
+import DeleteConfirmModal from '../../components/admin/DeleteConfirmModal';
 import { supabase } from '../../lib/supabase';
 import { useCurrentMember } from '../../contexts/CurrentMemberContext';
+import { emptyQuip } from '../../lib/quips';
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 const CATEGORIES = [
@@ -725,7 +728,7 @@ function ExpenseCard({ expense, splits, members, currentMember, onEdit, onDelete
           <span className="material-symbols-outlined" style={{ fontSize: 14 }}>edit</span>
         </button>
         <button
-          onClick={() => onDelete(expense.id)}
+          onClick={() => onDelete(expense.id, expense.title)}
           style={{ background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 4, padding: '6px', cursor: 'pointer', color: '#555', display: 'flex', alignItems: 'center', transition: 'color 0.15s' }}
           onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
           onMouseLeave={(e) => (e.currentTarget.style.color = '#555')}
@@ -750,6 +753,8 @@ export default function Expenses() {
   const [showAddModal,    setShowAddModal]    = useState(false);
   const [editingExpense,  setEditingExpense]  = useState(null);
   const [showSettleModal, setShowSettleModal] = useState(false);
+  // { kind: 'expense' | 'settlement', id, name } — null when nothing is pending
+  const [pendingDelete,   setPendingDelete]   = useState(null);
   const [settleSuggestion,setSettleSuggestion]= useState(null);
 
   const [search,         setSearch]         = useState('');
@@ -852,7 +857,6 @@ export default function Expenses() {
   }
 
   async function handleDeleteExpense(id) {
-    if (!window.confirm('Delete this expense? This cannot be undone.')) return;
     await supabase.from('expenses').delete().eq('id', id);
     loadAll();
   }
@@ -865,9 +869,15 @@ export default function Expenses() {
   }
 
   async function handleDeleteSettlement(id) {
-    if (!window.confirm('Remove this settlement record?')) return;
     await supabase.from('settlements').delete().eq('id', id);
     loadAll();
+  }
+
+  async function confirmDelete() {
+    const target = pendingDelete;
+    setPendingDelete(null);
+    if (target.kind === 'expense') await handleDeleteExpense(target.id);
+    else await handleDeleteSettlement(target.id);
   }
 
   function openEdit(expense) {
@@ -931,6 +941,7 @@ export default function Expenses() {
             <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: '#444', margin: '6px 0 0', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
               Track · Split · Settle
             </p>
+            <PageTagline />
           </div>
 
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
@@ -1023,7 +1034,7 @@ export default function Expenses() {
               <div style={{ textAlign: 'center', padding: '80px 0', color: '#333' }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 40, display: 'block', marginBottom: 12 }}>receipt_long</span>
                 <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12 }}>
-                  {expenses.length === 0 ? 'No expenses yet — add the first one!' : 'No expenses match the filters.'}
+                  {emptyQuip('expenses', expenses.length > 0, expenses.length)}
                 </div>
               </div>
             ) : (
@@ -1051,7 +1062,7 @@ export default function Expenses() {
                             members={members}
                             currentMember={currentMember}
                             onEdit={openEdit}
-                            onDelete={handleDeleteExpense}
+                            onDelete={(id, title) => setPendingDelete({ kind: 'expense', id, name: title })}
                           />
                         ))}
                       </div>
@@ -1358,7 +1369,7 @@ export default function Expenses() {
                         </span>
                         {toMem && <Avatar member={toMem} size={26} />}
                         <button
-                          onClick={() => handleDeleteSettlement(s.id)}
+                          onClick={() => setPendingDelete({ kind: 'settlement', id: s.id, name: `${fmt(s.amount)} settlement` })}
                           style={{ background: 'none', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 4, padding: '5px', cursor: 'pointer', color: '#444', display: 'flex', alignItems: 'center', flexShrink: 0, transition: 'color 0.15s' }}
                           onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
                           onMouseLeave={(e) => (e.currentTarget.style.color = '#444')}
@@ -1384,6 +1395,14 @@ export default function Expenses() {
           onClose={() => { setShowAddModal(false); setEditingExpense(null); }}
         />
       )}
+      <DeleteConfirmModal
+        open={!!pendingDelete}
+        title={pendingDelete?.kind === 'settlement' ? 'Remove Settlement?' : 'Delete Expense?'}
+        name={pendingDelete?.name}
+        confirmLabel={pendingDelete?.kind === 'settlement' ? 'Remove record' : 'Delete expense'}
+        onClose={() => setPendingDelete(null)}
+        onConfirm={confirmDelete}
+      />
       {showSettleModal && (
         <SettleUpModal
           members={members}

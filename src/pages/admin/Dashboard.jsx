@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
 import AdminNavbar from '../../components/admin/AdminNavbar';
+import PageTagline from '../../components/admin/PageTagline';
 import { DUE_SOON_DAYS, daysUntil } from '../../lib/ideas';
 
 /* ─── Constants ──────────────────────────────────────────────────── */
@@ -251,6 +252,7 @@ export default function AdminDashboard() {
             <p className="font-technical text-xs text-stone-500 uppercase tracking-widest mt-1">
               {todayStr}
             </p>
+            <PageTagline />
           </div>
           {!loading && orders.length > 0 && statusCounts.pending > 0 && (
             <Link

@@ -1,13 +1,16 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getPrimaryProductImage, parseProductImages } from '../../lib/productImages';
 import { supabase } from '../../lib/supabase';
 import AdminNavbar from '../../components/admin/AdminNavbar';
+import PageTagline from '../../components/admin/PageTagline';
 import ProductFormModal from '../../components/admin/ProductFormModal';
 import DeleteConfirmModal from '../../components/admin/DeleteConfirmModal';
 import Toast from '../../components/Toast';
 import { useCategories } from '../../lib/useCategories';
 import { formatDealRemaining, getDealInfo } from '../../lib/deals';
+import { emptyQuip } from '../../lib/quips';
 
 const STOCK_OPTIONS = [
   { value: 'all',          label: 'All Stock' },
@@ -90,6 +93,10 @@ function StatCard({ icon, label, value, accent }) {
 export default function AdminProducts() {
   const { categories } = useCategories();
 
+  // ?q= lets the command palette land here with a product already filtered.
+  const [searchParams] = useSearchParams();
+  const initialQuery = searchParams.get('q') ?? '';
+
   const [products,   setProducts]   = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState(null);
@@ -98,8 +105,8 @@ export default function AdminProducts() {
   const [categoryFilter,  setCategoryFilter]  = useState('All Categories');
   const [stockFilter,     setStockFilter]     = useState('all');
   const [variantsFilter,  setVariantsFilter]  = useState('all');
-  const [searchInput,     setSearchInput]     = useState('');
-  const [search,          setSearch]          = useState('');
+  const [searchInput,     setSearchInput]     = useState(initialQuery);
+  const [search,          setSearch]          = useState(initialQuery.trim().toLowerCase());
   const [isSearching,     setIsSearching]     = useState(false);
   const debounceRef = useRef(null);
 
@@ -262,12 +269,15 @@ export default function AdminProducts() {
 
         {/* ── Page header ─────────────────────────────────────────── */}
         <div className="flex items-center justify-between gap-4">
-          <h1
-            className="uppercase tracking-tight text-white"
-            style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 'clamp(2rem, 6vw, 3rem)', lineHeight: 1 }}
-          >
-            Products
-          </h1>
+          <div>
+            <h1
+              className="uppercase tracking-tight text-white"
+              style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 'clamp(2rem, 6vw, 3rem)', lineHeight: 1 }}
+            >
+              Products
+            </h1>
+            <PageTagline />
+          </div>
           <button
             onClick={handleAddProduct}
             disabled={loading}
@@ -413,7 +423,8 @@ export default function AdminProducts() {
           <div className="text-center py-24 border border-white/5 bg-[#111111]">
             {products.length === 0 ? (
               <>
-                <p className="font-headline text-4xl text-white mb-4">NO PRODUCTS YET</p>
+                <p className="font-headline text-4xl text-white mb-2">NO PRODUCTS YET</p>
+                <p className="font-body text-sm text-stone-600 mb-6">{emptyQuip('products', false, 0)}</p>
                 <button
                   onClick={handleAddProduct}
                   className="clip-parallelogram bg-[#ff5500] text-white font-technical text-xs
@@ -426,7 +437,8 @@ export default function AdminProducts() {
               </>
             ) : (
               <>
-                <p className="font-headline text-4xl text-white mb-4">NO PRODUCTS FOUND</p>
+                <p className="font-headline text-4xl text-white mb-2">NO PRODUCTS FOUND</p>
+                <p className="font-body text-sm text-stone-600 mb-6">{emptyQuip('products', true, products.length)}</p>
                 <button
                   onClick={() => { setCategoryFilter('All Categories'); setStockFilter('all'); setVariantsFilter('all'); setSearchInput(''); }}
                   className="font-technical text-xs uppercase tracking-widest text-[#ff5500]
@@ -582,7 +594,10 @@ export default function AdminProducts() {
 
       {/* ── Delete confirmation modal ────────────────────────────────── */}
       <DeleteConfirmModal
-        product={deletingProduct}
+        open={!!deletingProduct}
+        title="Delete Product?"
+        name={deletingProduct?.name}
+        confirmLabel="Delete product"
         onClose={() => setDeletingProduct(null)}
         onConfirm={handleDeleteConfirm}
       />

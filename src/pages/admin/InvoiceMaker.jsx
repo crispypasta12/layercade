@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import AdminNavbar from '../../components/admin/AdminNavbar';
+import PageTagline from '../../components/admin/PageTagline';
 import { fetchProducts } from '../../data/products';
 
 /* ─── Storage helpers ────────────────────────────────────────────── */
@@ -814,6 +815,7 @@ export default function InvoiceMaker() {
           <p className="font-technical text-xs text-stone-500 uppercase tracking-widest mt-1">
             Create &amp; export professional invoices
           </p>
+          <PageTagline />
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">

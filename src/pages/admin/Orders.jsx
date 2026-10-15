@@ -1,7 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
+import { orderSearchFilter } from '../../lib/orderSearch';
+import { emptyQuip } from '../../lib/quips';
 import AdminNavbar from '../../components/admin/AdminNavbar';
+import PageTagline from '../../components/admin/PageTagline';
 import OrderDetailModal from '../../components/admin/OrderDetailModal';
 import CreateOrderModal from '../../components/admin/CreateOrderModal';
 
@@ -74,6 +78,10 @@ function StatCard({ label, value, accent }) {
 /* ─── Main component ─────────────────────────────────────────────── */
 
 export default function AdminOrders() {
+  // ?q= lets the command palette land here with a customer already filtered.
+  const [searchParams] = useSearchParams();
+  const initialQuery = searchParams.get('q') ?? '';
+
   const [orders,        setOrders]        = useState([]);
   const [loading,       setLoading]       = useState(true);
   const [error,         setError]         = useState(null);
@@ -82,8 +90,8 @@ export default function AdminOrders() {
 
   // Filters
   const [statusFilter, setStatusFilter] = useState('all');
-  const [search,       setSearch]       = useState('');
-  const [searchInput,  setSearchInput]  = useState('');
+  const [search,       setSearch]       = useState(initialQuery.trim().toLowerCase());
+  const [searchInput,  setSearchInput]  = useState(initialQuery);
 
   // Pagination
   const [page,       setPage]       = useState(0);
@@ -121,13 +129,8 @@ export default function AdminOrders() {
 
     if (statusFilter !== 'all') query = query.eq('status', statusFilter);
 
-    if (search) {
-      const cleaned = search.replace(/^ord-/i, '');
-      const parts   = [`customer_name.ilike.%${cleaned}%`, `phone.ilike.%${cleaned}%`];
-      const idNum   = parseInt(cleaned, 10);
-      if (!isNaN(idNum)) parts.push(`id.eq.${idNum}`);
-      query = query.or(parts.join(','));
-    }
+    const searchFilter = orderSearchFilter(search);
+    if (searchFilter) query = query.or(searchFilter);
 
     const [tableRes, statsRes] = await Promise.all([
       query,
@@ -203,13 +206,8 @@ export default function AdminOrders() {
 
     if (statusFilter !== 'all') query = query.eq('status', statusFilter);
 
-    if (search) {
-      const cleaned = search.replace(/^ord-/i, '');
-      const parts   = [`customer_name.ilike.%${cleaned}%`, `phone.ilike.%${cleaned}%`];
-      const idNum   = parseInt(cleaned, 10);
-      if (!isNaN(idNum)) parts.push(`id.eq.${idNum}`);
-      query = query.or(parts.join(','));
-    }
+    const searchFilter = orderSearchFilter(search);
+    if (searchFilter) query = query.or(searchFilter);
 
     const { data } = await query;
     if (!data || data.length === 0) return;
@@ -258,6 +256,7 @@ export default function AdminOrders() {
           <p className="font-technical text-xs text-stone-500 uppercase tracking-widest mt-1">
             {loading ? 'Loading…' : `${stats.total} total orders`}
           </p>
+          <PageTagline />
         </div>
 
         {/* ── Stats cards ─────────────────────────────────────────── */}
@@ -385,7 +384,7 @@ export default function AdminOrders() {
           </div>
         ) : orders.length === 0 ? (
           <div className="text-center font-body text-stone-600 py-16 bg-[#111111] border border-white/5">
-            No orders found.
+            {emptyQuip('orders', !!search || statusFilter !== 'all', stats.total)}
           </div>
         ) : (
           <>

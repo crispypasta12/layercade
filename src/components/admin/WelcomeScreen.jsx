@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useCurrentMember } from '../../contexts/CurrentMemberContext';
+import { WELCOME, quip } from '../../lib/quips';
 
 function initials(name) {
   return name.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
@@ -9,6 +10,9 @@ export default function WelcomeGuard({ children }) {
   const { member, loading } = useCurrentMember();
   const [phase, setPhase] = useState('loading'); // 'loading' | 'greet' | 'fade' | 'done'
   const started = useRef(false);
+
+  // Chosen once per session so it cannot change during the fade.
+  const [greeting] = useState(() => quip(WELCOME));
 
   useEffect(() => {
     if (loading || started.current) return;
@@ -70,7 +74,7 @@ export default function WelcomeGuard({ children }) {
           </div>
           <div className="text-center">
             <p className="font-technical text-[10px] text-stone-500 uppercase tracking-widest mb-1">
-              Welcome back
+              {greeting}
             </p>
             <p
               className="text-white uppercase"

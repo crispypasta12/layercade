@@ -113,9 +113,64 @@ function VoteButton({ voters, myMemberId, membersById, onVote }) {
   );
 }
 
+// ─── Card sizes ───────────────────────────────────────────────
+// column: desktop column width. tile: minimum card width in the phone grid
+// (≈3 / 2 / 1 across on a phone). The rest is how much each card shows.
+
+const CARD_SIZES = {
+  s: { label: 'S', name: 'Small',  column: 200, tile: 100, pad: '8px 9px 9px',   title: 12, titleLines: 2, noteLines: 0, maxTags: 2,        icon: 28, showMeta: false },
+  m: { label: 'M', name: 'Medium', column: 260, tile: 150, pad: '10px 12px 12px', title: 13, titleLines: 2, noteLines: 2, maxTags: 3,        icon: 36, showMeta: true },
+  l: { label: 'L', name: 'Large',  column: 360, tile: 260, pad: '12px 14px 14px', title: 15, titleLines: 3, noteLines: 4, maxTags: Infinity, icon: 48, showMeta: true },
+};
+const CARD_SIZE_KEY = 'ideas_card_size';
+
+// A per-viewer preference, so it lives in this browser only; storage can be
+// unavailable (private mode), in which case it just resets to Medium.
+function useCardSize() {
+  const [size, setSize] = useState(() => {
+    try {
+      const saved = localStorage.getItem(CARD_SIZE_KEY);
+      return CARD_SIZES[saved] ? saved : 'm';
+    } catch {
+      return 'm';
+    }
+  });
+  const choose = next => {
+    setSize(next);
+    try { localStorage.setItem(CARD_SIZE_KEY, next); } catch { /* not persisted */ }
+  };
+  return [size, choose];
+}
+
+// On phones the filter row scrolls sideways, so the switch goes first there
+// instead of at the far (hidden) end.
+function CardSizeSwitch({ size, onChange, leading = false }) {
+  return (
+    <div role="group" aria-label="Card size" title="Card size" style={{ display: 'flex', flexShrink: 0, border: '1px solid rgba(255,255,255,0.07)', ...(leading ? { order: -1 } : { marginLeft: 'auto' }) }}>
+      <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#444', padding: '0 6px', alignSelf: 'center' }}>photo_size_select_large</span>
+      {Object.entries(CARD_SIZES).map(([id, cfg]) => (
+        <button
+          key={id}
+          onClick={() => onChange(id)}
+          aria-pressed={size === id}
+          title={`${cfg.name} cards`}
+          style={{
+            background: size === id ? 'rgba(255,85,0,0.12)' : 'none', border: 'none',
+            borderLeft: '1px solid rgba(255,255,255,0.07)',
+            color: size === id ? '#ff5500' : '#666', cursor: 'pointer',
+            padding: '6px 10px', fontFamily: mono, fontSize: 10, letterSpacing: '0.06em',
+          }}
+        >
+          {cfg.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ─── Idea Card ────────────────────────────────────────────────
 
-function IdeaCard({ idea, member, voters = [], myMemberId, membersById, onVote, onClick, onDragStart, isDragTarget, onCardDragOver, onCardDrop }) {
+function IdeaCard({ idea, size = CARD_SIZES.m, member, voters = [], myMemberId, membersById, onVote, onClick, onDragStart, isDragTarget, onCardDragOver, onCardDrop }) {
   if (idea.pending) {
     return (
       <div style={{ background: '#161616', border: '1px dashed rgba(255,85,0,0.35)', padding: 12 }}>
@@ -164,7 +219,7 @@ function IdeaCard({ idea, member, voters = [], myMemberId, membersById, onVote, 
           />
         ) : (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2a2a2a' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 36 }}>lightbulb</span>
+            <span className="material-symbols-outlined" style={{ fontSize: size.icon }}>lightbulb</span>
           </div>
         )}
         <div style={{ position: 'absolute', top: 8, left: 8 }}>
@@ -177,32 +232,32 @@ function IdeaCard({ idea, member, voters = [], myMemberId, membersById, onVote, 
         )}
       </div>
 
-      <div style={{ padding: '10px 12px 12px' }}>
-        <div style={{ color: '#e5e2e1', fontSize: 13, lineHeight: 1.35, fontWeight: 500, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+      <div style={{ padding: size.pad }}>
+        <div style={{ color: '#e5e2e1', fontSize: size.title, lineHeight: 1.35, fontWeight: 500, display: '-webkit-box', WebkitLineClamp: size.titleLines, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
           {idea.title}
         </div>
-        {idea.notes && (
-          <div style={{ marginTop: 4, color: '#666', fontSize: 11, lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+        {idea.notes && size.noteLines > 0 && (
+          <div style={{ marginTop: 4, color: '#666', fontSize: 11, lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: size.noteLines, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
             {idea.notes}
           </div>
         )}
         {idea.tags?.length > 0 && (
           <div style={{ marginTop: 8, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-            {idea.tags.slice(0, 3).map(t => <TagChip key={t} tag={t} />)}
-            {idea.tags.length > 3 && <span style={{ color: '#444', fontSize: 9, fontFamily: mono, alignSelf: 'center' }}>+{idea.tags.length - 3}</span>}
+            {idea.tags.slice(0, size.maxTags).map(t => <TagChip key={t} tag={t} />)}
+            {idea.tags.length > size.maxTags && <span style={{ color: '#444', fontSize: 9, fontFamily: mono, alignSelf: 'center' }}>+{idea.tags.length - size.maxTags}</span>}
           </div>
         )}
         {idea.est_cost != null && (
-          <div title="Cost per piece · selling price" style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6, fontFamily: mono, fontSize: 10, color: '#888' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#555' }}>calculate</span>
-            {taka(idea.est_cost)} cost
-            {idea.est_price != null && <span style={{ color: '#22c55e' }}>· {taka(idea.est_price)}</span>}
+          <div title={`Cost ${taka(idea.est_cost)} per piece${idea.est_price != null ? ` · sells for ${taka(idea.est_price)}` : ''}`} style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: 6, rowGap: 2, fontFamily: mono, fontSize: 10, color: '#888' }}>
+            {size.showMeta && <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#555' }}>calculate</span>}
+            <span style={{ whiteSpace: 'nowrap' }}>{taka(idea.est_cost)}{size.showMeta && ' cost'}</span>
+            {idea.est_price != null && <span style={{ color: '#22c55e', whiteSpace: 'nowrap' }}>→ {taka(idea.est_price)}</span>}
           </div>
         )}
         <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
           <Avatar member={member} />
           <span style={{ flex: 1, minWidth: 0, color: '#555', fontSize: 10, fontFamily: mono, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {idea.author ? `by ${idea.author} · ` : ''}{timeAgo(idea.created_at)}
+            {size.showMeta && <>{idea.author ? `by ${idea.author} · ` : ''}{timeAgo(idea.created_at)}</>}
           </span>
           <VoteButton voters={voters} myMemberId={myMemberId} membersById={membersById} onVote={() => onVote(idea.id)} />
           {idea.url && (
@@ -227,13 +282,13 @@ function IdeaCard({ idea, member, voters = [], myMemberId, membersById, onVote, 
 
 // ─── Column ───────────────────────────────────────────────────
 
-function IdeaColumn({ column, ideas, membersById, votesByIdea, myMemberId, onVote, onCardClick, onDragStart, onDrop, fullWidth }) {
+function IdeaColumn({ column, ideas, size = CARD_SIZES.m, membersById, votesByIdea, myMemberId, onVote, onCardClick, onDragStart, onDrop, fullWidth }) {
   const [dragOver, setDragOver] = useState(false);
   const [dragOverCardId, setDragOverCardId] = useState(null);
 
   return (
     <div
-      style={{ width: fullWidth ? '100%' : 260, flexShrink: 0, display: 'flex', flexDirection: 'column' }}
+      style={{ width: fullWidth ? '100%' : size.column, flexShrink: 0, display: 'flex', flexDirection: 'column', transition: 'width 0.2s' }}
       onDragOver={e => { e.preventDefault(); setDragOver(true); setDragOverCardId(null); }}
       onDragLeave={e => {
         if (!e.currentTarget.contains(e.relatedTarget)) {
@@ -268,11 +323,12 @@ function IdeaColumn({ column, ideas, membersById, votesByIdea, myMemberId, onVot
         boxShadow: dragOver ? `0 0 8px ${column.color}60` : 'none',
       }} />
 
-      <div style={{ display: 'grid', gridTemplateColumns: fullWidth ? 'repeat(auto-fill, minmax(150px, 1fr))' : '1fr', gap: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: fullWidth ? `repeat(auto-fill, minmax(${size.tile}px, 1fr))` : '1fr', gap: 8 }}>
         {ideas.map(idea => (
           <IdeaCard
             key={idea.id}
             idea={idea}
+            size={size}
             member={membersById[idea.added_by]}
             voters={votesByIdea[idea.id]}
             myMemberId={myMemberId}
@@ -750,6 +806,7 @@ export default function Ideas() {
   const [filterSource, setFilterSource] = useState('');
   const [filterTag,    setFilterTag]    = useState('');
   const [sortBy,       setSortBy]       = useState('manual');
+  const [cardSize,     setCardSize]     = useCardSize();
   const [weekAgo] = useState(() => new Date(Date.now() - 7 * 86400000));
   const dragId = useRef(null);
   const toastTimer = useRef(null);
@@ -1188,6 +1245,7 @@ export default function Ideas() {
                 Clear
               </button>
             )}
+            <CardSizeSwitch size={cardSize} onChange={setCardSize} leading={isMobile} />
           </div>
         </div>
 
@@ -1227,6 +1285,7 @@ export default function Ideas() {
             <IdeaColumn
               column={IDEA_STATUSES.find(c => c.id === activeCol) || IDEA_STATUSES[0]}
               ideas={byCol[activeCol] || []}
+              size={CARD_SIZES[cardSize]}
               membersById={membersById}
               votesByIdea={votesByIdea}
               myMemberId={member?.id}
@@ -1243,6 +1302,7 @@ export default function Ideas() {
                   key={col.id}
                   column={col}
                   ideas={byCol[col.id] || []}
+                  size={CARD_SIZES[cardSize]}
                   membersById={membersById}
                   votesByIdea={votesByIdea}
                   myMemberId={member?.id}

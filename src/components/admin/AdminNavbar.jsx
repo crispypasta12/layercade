@@ -35,6 +35,7 @@ const NAV_LINKS = [
   { label: 'Calculator', to: '/admin/calculator',             icon: 'calculate' },
   { label: 'Invoices',   to: '/admin/invoices',               icon: 'receipt' },
   { label: 'Tasks',      to: '/admin/tasks',                  icon: 'task_alt' },
+  { label: 'Ideas',      to: '/admin/ideas',                  icon: 'lightbulb' },
   { label: 'Expenses',   to: '/admin/expenses',               icon: 'payments' },
   { label: 'Reviews',   to: '/admin/reviews',                icon: 'rate_review' },
 ];

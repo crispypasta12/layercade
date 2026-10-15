@@ -31,6 +31,7 @@ const AdminTasks = lazy(() => import('./pages/admin/Tasks'));
 const AdminExpenses = lazy(() => import('./pages/admin/Expenses'));
 const AdminInventory = lazy(() => import('./pages/admin/Inventory'));
 const AdminReviews  = lazy(() => import('./pages/admin/Reviews'));
+const AdminIdeas    = lazy(() => import('./pages/admin/Ideas'));
 
 function RouteFallback() {
   return <div className="min-h-screen bg-[#080808]" />;
@@ -167,6 +168,14 @@ export default function App() {
           }
         />
         <Route path="/admin/colors" element={<Navigate to="/admin/inventory" replace />} />
+        <Route
+          path="/admin/ideas"
+          element={
+            <ProtectedRoute>
+              <AdminIdeas />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/admin/reviews"
           element={

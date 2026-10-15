@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import AdminNavbar from '../../components/admin/AdminNavbar';
+import { supabase } from '../../lib/supabase';
 
 /* ─── Defaults ───────────────────────────────────────────────────── */
 
@@ -171,6 +172,46 @@ function calculate(inputs, selectedMaterials, allMaterials, settings) {
     totalProfit,
     profitMargin,
   };
+}
+
+/* ─── Idea banner ────────────────────────────────────────────────
+   Shown when the calculator was opened from an idea's "Estimate cost". */
+
+function IdeaCostBanner({ idea, result, fmt, saving, error, onSave }) {
+  return (
+    <div className="bg-[#ff5500]/5 border border-[#ff5500]/30 px-4 py-3 space-y-3">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="material-symbols-outlined text-[#ff5500]" style={{ fontSize: 16 }}>lightbulb</span>
+          <span className="font-technical text-[10px] text-stone-400 uppercase tracking-widest">Costing idea</span>
+          <span className="font-body text-sm text-white truncate">{idea.title}</span>
+        </div>
+        <Link to="/admin/ideas" state={{ openIdeaId: idea.id }} className="font-technical text-[10px] text-stone-500 uppercase tracking-widest hover:text-white">
+          ← Back without saving
+        </Link>
+      </div>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <span className="font-technical text-[10px] text-stone-500 uppercase tracking-widest">
+          {idea.est_cost != null
+            ? `Last saved: ${fmt(Number(idea.est_cost))} cost · ${fmt(Number(idea.est_price))} price`
+            : idea.print_hours || idea.filament_g
+              ? 'Print time and filament pre-filled from the idea'
+              : 'Fill in the print details below, then save'}
+        </span>
+        <button
+          onClick={onSave}
+          disabled={!result || saving}
+          className="flex items-center gap-2 px-4 py-2 bg-[#ff5500] text-white font-technical text-[10px] uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#ff6a1f] transition-colors"
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 15 }}>{saving ? 'progress_activity' : 'save'}</span>
+          {result
+            ? `Save to idea · ${fmt(result.netCostPerPiece)} cost · ${fmt(result.finalPricePerPiece)} price`
+            : 'Save to idea'}
+        </button>
+      </div>
+      {error && <p className="font-technical text-[10px] text-red-400">Couldn&apos;t save: {error}</p>}
+    </div>
+  );
 }
 
 /* ─── Currency formatter ─────────────────────────────────────────── */
@@ -742,6 +783,9 @@ export default function CostCalculator() {
   const [presets,        setPresets]        = useState(() => load('calc_presets',   DEFAULT_PRESETS));
   // Opened from an idea on the Ideas board: start from its print estimate.
   const fromIdea = useLocation().state?.idea ?? null;
+  const navigate = useNavigate();
+  const [savingToIdea, setSavingToIdea] = useState(false);
+  const [saveToIdeaError, setSaveToIdeaError] = useState(null);
   const [inputs,         setInputs]         = useState(() => (
     fromIdea?.print_hours ? { ...DEFAULT_INPUTS, print_hours: Number(fromIdea.print_hours) } : DEFAULT_INPUTS
   ));
@@ -829,21 +873,29 @@ export default function CostCalculator() {
         </div>
 
         {fromIdea && (
-          <div className="flex items-center justify-between gap-3 flex-wrap bg-[#ff5500]/5 border border-[#ff5500]/30 px-4 py-3">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="material-symbols-outlined text-[#ff5500]" style={{ fontSize: 16 }}>lightbulb</span>
-              <span className="font-technical text-[10px] text-stone-400 uppercase tracking-widest">Costing idea</span>
-              <span className="font-body text-sm text-white truncate">{fromIdea.title}</span>
-            </div>
-            <span className="font-technical text-[10px] text-stone-500 uppercase tracking-widest">
-              {fromIdea.print_hours || fromIdea.filament_g
-                ? 'Print time and filament pre-filled from the idea'
-                : 'No estimate on the idea yet, so these are defaults'}
-            </span>
-            <Link to="/admin/ideas" className="font-technical text-[10px] text-[#ff5500] uppercase tracking-widest hover:underline">
-              ← Back to Ideas
-            </Link>
-          </div>
+          <IdeaCostBanner
+            idea={fromIdea}
+            result={result}
+            fmt={fmt}
+            saving={savingToIdea}
+            error={saveToIdeaError}
+            onSave={async () => {
+              setSavingToIdea(true);
+              setSaveToIdeaError(null);
+              const totalWeight = selectedMats.reduce((sum, m) => sum + (Number(m.weight_g) || 0), 0);
+              const { error } = await supabase.from('ideas').update({
+                est_cost:        Math.round(result.netCostPerPiece * 100) / 100,
+                est_price:       result.finalPricePerPiece,
+                costed_at:       new Date().toISOString(),
+                // Keep any tweaks made here as the idea's estimate too.
+                est_print_hours: Number(inputs.print_hours) > 0 ? Number(inputs.print_hours) : null,
+                est_filament_g:  totalWeight > 0 ? Math.round(totalWeight) : null,
+              }).eq('id', fromIdea.id);
+              setSavingToIdea(false);
+              if (error) { setSaveToIdeaError(error.message); return; }
+              navigate('/admin/ideas', { state: { openIdeaId: fromIdea.id, costSaved: true } });
+            }}
+          />
         )}
 
         {/* ── Settings panel (collapsible) ────────────────────────── */}

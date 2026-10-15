@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import AdminNavbar from '../../components/admin/AdminNavbar';
 import ProductFormModal from '../../components/admin/ProductFormModal';
@@ -30,6 +30,10 @@ function useIsMobile() {
 
 function initials(name) {
   return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+}
+
+function taka(n) {
+  return `৳${Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 }
 
 function timeAgo(iso) {
@@ -188,6 +192,13 @@ function IdeaCard({ idea, member, voters = [], myMemberId, membersById, onVote, 
             {idea.tags.length > 3 && <span style={{ color: '#444', fontSize: 9, fontFamily: mono, alignSelf: 'center' }}>+{idea.tags.length - 3}</span>}
           </div>
         )}
+        {idea.est_cost != null && (
+          <div title="Cost per piece · selling price" style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6, fontFamily: mono, fontSize: 10, color: '#888' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#555' }}>calculate</span>
+            {taka(idea.est_cost)} cost
+            {idea.est_price != null && <span style={{ color: '#22c55e' }}>· {taka(idea.est_price)}</span>}
+          </div>
+        )}
         <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
           <Avatar member={member} />
           <span style={{ flex: 1, minWidth: 0, color: '#555', fontSize: 10, fontFamily: mono, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -307,6 +318,8 @@ function IdeaModal({ idea, membersById, allTags, product, onClose, onSave, onDel
     tags: idea.tags || [],
     est_print_hours: idea.est_print_hours ?? '',
     est_filament_g: idea.est_filament_g ?? '',
+    est_cost: idea.est_cost ?? '',
+    est_price: idea.est_price ?? '',
     product_id: idea.product_id ?? null,
   });
   const [tagDraft, setTagDraft] = useState('');
@@ -366,12 +379,15 @@ function IdeaModal({ idea, membersById, allTags, product, onClose, onSave, onDel
     uploaded.current.filter(url => url !== form.image_url).forEach(url => removeIdeaImage(supabase, url));
     uploaded.current = [];
     const positive = v => (Number(v) > 0 ? Number(v) : null);
+    const money = v => (v === '' || v == null || Number(v) < 0 || isNaN(Number(v)) ? null : Math.round(Number(v) * 100) / 100);
     return {
       ...idea, ...form, tags,
       title: form.title.trim(),
       url: extractUrl(form.url) || null,
       est_print_hours: positive(form.est_print_hours),
       est_filament_g: positive(form.est_filament_g) && Math.round(Number(form.est_filament_g)),
+      est_cost: money(form.est_cost),
+      est_price: money(form.est_price),
     };
   };
 
@@ -477,7 +493,7 @@ function IdeaModal({ idea, membersById, allTags, product, onClose, onSave, onDel
             <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
               <button onClick={() => canSave && onEstimate(collect())} disabled={!canSave} style={actionButton}>
                 <span className="material-symbols-outlined" style={{ fontSize: 14 }}>calculate</span>
-                Estimate cost
+                {idea.est_cost != null ? 'Recalculate cost' : 'Estimate cost'}
               </button>
               {form.product_id ? (
                 <div style={{ border: '1px solid rgba(34,197,94,0.3)', background: 'rgba(34,197,94,0.06)', padding: '8px 10px' }}>
@@ -568,6 +584,25 @@ function IdeaModal({ idea, membersById, allTags, product, onClose, onSave, onDel
               <div>
                 <label style={fieldLabel}>Filament (grams)</label>
                 <input type="number" min="0" step="1" inputMode="numeric" value={form.est_filament_g} onChange={e => set('est_filament_g', e.target.value)} placeholder="e.g. 120" style={input} />
+              </div>
+            </div>
+            <div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={fieldLabel}>Cost / piece (৳)</label>
+                  <input type="number" min="0" step="0.01" inputMode="decimal" value={form.est_cost} onChange={e => set('est_cost', e.target.value)} placeholder="—" style={input} />
+                </div>
+                <div>
+                  <label style={fieldLabel}>Selling price (৳)</label>
+                  <input type="number" min="0" step="1" inputMode="decimal" value={form.est_price} onChange={e => set('est_price', e.target.value)} placeholder="—" style={input} />
+                </div>
+              </div>
+              <div style={{ marginTop: 6, fontFamily: mono, fontSize: 9, color: '#555', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {idea.costed_at
+                  ? <>From the calculator {timeAgo(idea.costed_at)}{Number(form.est_cost) > 0 && Number(form.est_price) > 0 && (
+                      <span style={{ color: '#22c55e' }}>· {Math.round((1 - Number(form.est_cost) / Number(form.est_price)) * 100)}% margin</span>
+                    )}</>
+                  : <>Use <b style={{ color: '#888', fontWeight: 400 }}>Estimate cost</b> to fill these in, or type your own.</>}
               </div>
             </div>
             <div>
@@ -709,6 +744,7 @@ export default function Ideas() {
   const [showPhoneHelp, setShowPhoneHelp] = useState(false);
   const [enrich,     setEnrich]     = useState(null); // { done, total } while fetching previews after an import
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
   const shareHandled = useRef(false);
   const navigate = useNavigate();
   const [filterSource, setFilterSource] = useState('');
@@ -849,6 +885,20 @@ export default function Ideas() {
   const captureLinkRef = useRef(handleCapture);
   useEffect(() => { captureImageRef.current = handleCaptureImage; captureLinkRef.current = handleCapture; });
 
+  // Back from the Cost Calculator: reopen the idea that was being costed.
+  useEffect(() => {
+    const { openIdeaId, costSaved } = location.state || {};
+    if (loading || !openIdeaId) return;
+    navigate('.', { replace: true, state: null });
+    const idea = ideas.find(i => i.id === openIdeaId);
+    if (!idea) return;
+    setActiveCol(idea.status);
+    setModalIdea(idea);
+    if (costSaved) {
+      showToastRef.current(`Saved to the idea: ${taka(idea.est_cost)} cost, ${taka(idea.est_price)} selling price.`);
+    }
+  }, [loading, location.state, ideas, navigate]);
+
   // Shared from a phone: Android's share target and the iPhone Shortcut both
   // open /admin/ideas?url=… (or ?text=… when the app shares "caption + link").
   // Waits for the board to load so the duplicate check sees existing ideas.
@@ -903,6 +953,8 @@ export default function Ideas() {
       tags: idea.tags,
       est_print_hours: idea.est_print_hours ?? null,
       est_filament_g: idea.est_filament_g ?? null,
+      est_cost: idea.est_cost ?? null,
+      est_price: idea.est_price ?? null,
       product_id: idea.product_id ?? null,
       ...(linkChanged && {
         url: idea.url,
@@ -960,7 +1012,10 @@ export default function Ideas() {
     const saved = await handleSave(idea, { keepOpen: true });
     if (!saved) return;
     navigate('/admin/calculator', {
-      state: { idea: { id: saved.id, title: saved.title, print_hours: saved.est_print_hours, filament_g: saved.est_filament_g } },
+      state: { idea: {
+        id: saved.id, title: saved.title, print_hours: saved.est_print_hours, filament_g: saved.est_filament_g,
+        est_cost: saved.est_cost, est_price: saved.est_price,
+      } },
     });
   };
 
@@ -1233,7 +1288,7 @@ export default function Ideas() {
         {productFor && (
           <ProductFormModal
             product={null}
-            prefill={{ name: productFor.title, description: productFor.notes || '' }}
+            prefill={{ name: productFor.title, description: productFor.notes || '', cost_price: productFor.est_cost, price: productFor.est_price }}
             onClose={() => setProductFor(null)}
             onSuccess={handleProductCreated}
           />

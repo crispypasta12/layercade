@@ -302,8 +302,8 @@ export default function ProductFormModal({ product, prefill, onClose, onSuccess 
   const [name, setName] = useState(product?.name ?? seed?.name ?? '');
   const [slug, setSlug] = useState(product?.slug ?? (seed?.name ? generateSlug(seed.name) : ''));
   const [description, setDescription] = useState(product?.description ?? seed?.description ?? '');
-  const [price, setPrice] = useState(product?.price != null ? String(product.price) : '');
-  const [costPrice, setCostPrice] = useState(product?.cost_price != null ? String(product.cost_price) : '');
+  const [price, setPrice] = useState(product?.price != null ? String(product.price) : seed?.price != null ? String(seed.price) : '');
+  const [costPrice, setCostPrice] = useState(product?.cost_price != null ? String(product.cost_price) : seed?.cost_price != null ? String(seed.cost_price) : '');
   const [dealPrice, setDealPrice] = useState(product?.deal_price != null ? String(product.deal_price) : '');
   const [dealEndsAt, setDealEndsAt] = useState(toLocalInput(product?.deal_ends_at));
   const now = useNow();

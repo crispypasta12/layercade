@@ -8,9 +8,10 @@ import { PALETTE, quip } from '../../lib/quips';
 /**
  * ⌘K palette. Mounted once by AdminNavbar, which every admin page renders.
  *
- * Three result sources: the nav destinations (always), then orders and products
- * looked up live once you type. Recents sit on top when the box is empty, since
- * most trips through here repeat the last one.
+ * Result sources: actions (do something), the nav destinations (go
+ * somewhere), then orders and products looked up live once you type. Recents
+ * sit on top when the box is empty, since most trips through here repeat the
+ * last one. Typing or pasting a link offers to save it to the Ideas board.
  */
 
 const RECENTS_KEY = 'admin_palette_recents';
@@ -33,6 +34,30 @@ const DESTINATIONS = [
   { id: 'nav-invoices',   label: 'Invoice Maker',   to: '/admin/invoices',   icon: 'receipt',       group: 'The Damage',  keywords: 'billing pdf invoice' },
   { id: 'nav-expenses',   label: 'Expenses',        to: '/admin/expenses',   icon: 'payments',      group: 'The Damage',  keywords: 'spending money splits settlements' },
 ];
+
+/* ─── Actions ─────────────────────────────────────────────────────── */
+// Each either links to a page that acts on a URL param (see useUrlAction) or
+// names an `action` that AdminNavbar runs, for things that live in the navbar.
+
+const ACTIONS = [
+  { id: 'act-new-task',    label: 'New task',        to: '/admin/tasks?new=1',            icon: 'add_task',               group: 'Action', keywords: 'create add todo assign job' },
+  { id: 'act-my-tasks',    label: 'My tasks',        to: '/admin/tasks?mine=1',           icon: 'person_check',           group: 'Action', keywords: 'assigned to me mine todo' },
+  { id: 'act-new-expense', label: 'Log expense',     to: '/admin/expenses?new=1',         icon: 'add_card',               group: 'Action', keywords: 'add spend paid bought money receipt' },
+  { id: 'act-settle',      label: 'Settle up',       to: '/admin/expenses?tab=balances',  icon: 'account_balance_wallet', group: 'Action', keywords: 'balance owe owed pay debts' },
+  { id: 'act-new-product', label: 'New product',     to: '/admin/products?new=1',         icon: 'add_box',                group: 'Action', keywords: 'create add listing catalogue' },
+  { id: 'act-add-idea',    label: 'Add idea',        to: '/admin/ideas',                  icon: 'lightbulb',              group: 'Action', keywords: 'save link paste makerworld inspiration', sub: 'Or paste a link right here' },
+  { id: 'act-avatar',      label: 'Change avatar',   action: 'avatar',                    icon: 'face',                   group: 'Action', keywords: 'profile picture face me' },
+  { id: 'act-logout',      label: 'Log out',         action: 'logout',                    icon: 'logout',                 group: 'Action', keywords: 'sign out exit leave' },
+];
+
+const COMMANDS = [...ACTIONS, ...DESTINATIONS];
+
+// A pasted link turns into "save this to Ideas" — the Ideas board already
+// imports from ?url= (it's how the phone share sheet works).
+function linkIn(text) {
+  const m = text.match(/https?:\/\/\S+/i);
+  return m ? m[0] : null;
+}
 
 /* ─── Recents ─────────────────────────────────────────────────────── */
 
@@ -134,7 +159,7 @@ function Row({ item, active, onSelect, id }) {
  * Mounted only while open (AdminNavbar owns the AnimatePresence), so opening
  * the palette is a fresh mount: no state to reset, nothing stale to clear.
  */
-export default function CommandPalette({ onClose }) {
+export default function CommandPalette({ onClose, onAction }) {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [cursor, setCursor] = useState(0);
@@ -211,15 +236,30 @@ export default function CommandPalette({ onClose }) {
   const items = useMemo(() => {
     if (!term) {
       const recentItems = recents
-        .map((id) => DESTINATIONS.find((d) => d.id === id))
+        .map((id) => COMMANDS.find((d) => d.id === id))
         .filter(Boolean)
         .map((d) => ({ ...d, group: 'Recent' }));
 
       const recentIds = new Set(recentItems.map((r) => r.id));
-      return [...recentItems, ...DESTINATIONS.filter((d) => !recentIds.has(d.id))];
+      return [...recentItems, ...COMMANDS.filter((d) => !recentIds.has(d.id))];
     }
 
-    const matched = DESTINATIONS
+    const link = linkIn(term);
+    if (link) {
+      let host = link;
+      try { host = new URL(link).hostname.replace(/^www\./, ''); } catch { /* keep raw */ }
+      return [{
+        id: 'act-save-link',
+        label: 'Save link to Ideas',
+        sub: host,
+        icon: 'bookmark_add',
+        group: 'Action',
+        to: `/admin/ideas?url=${encodeURIComponent(link)}`,
+        transient: true,
+      }];
+    }
+
+    const matched = COMMANDS
       .map((d) => ({ dest: d, s: scoreDestination(d, term) }))
       .filter(({ s }) => s > 0)
       .sort((a, b) => b.s - a.s)
@@ -264,8 +304,9 @@ export default function CommandPalette({ onClose }) {
     }
     if (!item.transient) remember(item.id);
     onClose();
-    navigate(item.to);
-  }, [items, navigate, onClose, remember]);
+    if (item.action) onAction?.(item.action);
+    else navigate(item.to);
+  }, [items, navigate, onClose, onAction, remember]);
 
   /* ── Keys inside the palette ────────────────────────────────── */
 

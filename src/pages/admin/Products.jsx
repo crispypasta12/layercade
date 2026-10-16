@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useUrlAction } from '../../lib/useUrlAction';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getPrimaryProductImage, parseProductImages } from '../../lib/productImages';
 import { supabase } from '../../lib/supabase';
@@ -193,6 +194,9 @@ export default function AdminProducts() {
     setEditingProduct(null);
     setShowProductModal(true);
   };
+
+  // ?new=1 (⌘K "New product") opens a blank product form.
+  useUrlAction('new', true, handleAddProduct);
 
   const handleEditProduct = (product) => {
     setEditingProduct(product);

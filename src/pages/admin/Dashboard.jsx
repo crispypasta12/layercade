@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
 import AdminNavbar from '../../components/admin/AdminNavbar';
 import PageTagline from '../../components/admin/PageTagline';
+import MyDesk from '../../components/admin/MyDesk';
 import { DUE_SOON_DAYS, daysUntil } from '../../lib/ideas';
 
 /* ─── Constants ──────────────────────────────────────────────────── */
@@ -271,6 +272,9 @@ export default function AdminDashboard() {
             </Link>
           )}
         </div>
+
+        {/* ── Your desk ────────────────────────────────────────────── */}
+        <MyDesk />
 
         {/* ── Revenue cards ────────────────────────────────────────── */}
         <div>

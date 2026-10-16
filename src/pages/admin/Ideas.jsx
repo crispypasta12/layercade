@@ -45,9 +45,9 @@ function timeAgo(iso) {
   return d < 30 ? `${d}d ago` : new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function Avatar({ member, size = 20 }) {
+function Avatar({ member, size = 20, tagged = false }) {
   if (!member) return null;
-  return <MemberAvatar member={member} size={size} title={`Added by ${member.name}`} />;
+  return <MemberAvatar member={member} size={size} tagged={tagged} title={`Added by ${member.name}`} />;
 }
 
 function SourceBadge({ source }) {
@@ -282,7 +282,7 @@ function IdeaCard({ idea, size = CARD_SIZES.m, member, voters = [], myMemberId, 
           </div>
         )}
         <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Avatar member={member} />
+          <Avatar member={member} tagged />
           <span style={{ flex: 1, minWidth: 0, color: '#555', fontSize: 10, fontFamily: mono, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {size.showMeta && <>{idea.author ? `by ${idea.author} · ` : ''}{timeAgo(idea.created_at)}</>}
           </span>

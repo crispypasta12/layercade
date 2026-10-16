@@ -8,6 +8,7 @@ import { GROUP_TAGLINES } from '../../lib/quips';
 import CommandPalette from './CommandPalette';
 import MemberAvatar from './MemberAvatar';
 import AvatarPicker from './AvatarPicker';
+import { shortcutLabel } from '../../lib/platform';
 
 // Clicking the chip opens the avatar picker — it is the one place every admin
 // sees their own face, so it is where they would look to change it.
@@ -336,7 +337,7 @@ export default function AdminNavbar() {
             aria-label="Open command palette"
           >
             <span className="material-symbols-outlined" style={{ fontSize: 14 }}>search</span>
-            <span className="font-technical text-[10px] tracking-widest">⌘K</span>
+            <span className="font-technical text-[10px] tracking-widest">{shortcutLabel('K')}</span>
           </button>
 
           {/* Desktop user chip (with name) */}
@@ -452,7 +453,15 @@ export default function AdminNavbar() {
 
       {/* Mounted only while open, so each ⌘K starts from a clean slate */}
       <AnimatePresence>
-        {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
+        {paletteOpen && (
+          <CommandPalette
+            onClose={() => setPaletteOpen(false)}
+            onAction={(action) => {
+              if (action === 'avatar') setAvatarOpen(true);
+              if (action === 'logout') handleLogout();
+            }}
+          />
+        )}
       </AnimatePresence>
       <AnimatePresence>
         {avatarOpen && <AvatarPicker onClose={() => setAvatarOpen(false)} />}

@@ -3,6 +3,8 @@ import AdminNavbar from '../../components/admin/AdminNavbar';
 import { supabase } from '../../lib/supabase';
 import { pageTagline } from '../../lib/quips';
 import MemberAvatar from '../../components/admin/MemberAvatar';
+import { useCurrentMember } from '../../contexts/CurrentMemberContext';
+import { useUrlAction } from '../../lib/useUrlAction';
 import { AnimatePresence } from 'framer-motion';
 
 // ─── Constants ────────────────────────────────────────────────
@@ -49,8 +51,8 @@ function useIsMobile() {
 
 // ─── Avatar ───────────────────────────────────────────────────
 
-function Avatar({ member, size = 28 }) {
-  return <MemberAvatar member={member} size={size} />;
+function Avatar({ member, size = 28, tagged = false }) {
+  return <MemberAvatar member={member} size={size} tagged={tagged} />;
 }
 
 // ─── Priority Badge ────────────────────────────────────────────
@@ -155,7 +157,7 @@ function TaskCard({ task, members, onClick, onDragStart, isDragTarget, onCardDra
         <div style={{ display: 'flex' }}>
           {assignees.slice(0, 3).map((m, i) => (
             <div key={m.id} style={{ marginLeft: i > 0 ? -5 : 0, zIndex: 3 - i, position: 'relative' }}>
-              <Avatar member={m} size={22} />
+              <Avatar member={m} size={22} tagged />
             </div>
           ))}
           {assignees.length > 3 && (
@@ -896,21 +898,22 @@ export default function Tasks() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const dragId = useRef(null);
+  const { member: me } = useCurrentMember();
+
+  // ?mine=1 (Dashboard, ⌘K) filters to my tasks; ?new=1 opens a blank task.
+  useUrlAction('mine', !loading && !!me, () => setFilterMember(me.id));
+  useUrlAction('new', !loading, () => setModalTask({}));
 
   // ── Load ──
   useEffect(() => {
     Promise.all([
       supabase.from('tasks').select('*').order('position'),
-      supabase.from('team_members').select('*').order('created_at'),
+      supabase.from('members').select('*').order('created_at'),
       supabase.from('task_roles').select('*').order('label'),
       supabase.from('member_roles').select('*'),
-      // Avatars live on public.members (the login table); tasks still point at
-      // team_members, so borrow each person's avatar by name.
-      supabase.from('members').select('name, avatar'),
-    ]).then(([t, m, r, mr, av]) => {
-      const avatarByName = new Map((av.data || []).map(a => [a.name.trim().toLowerCase(), a.avatar]));
+    ]).then(([t, m, r, mr]) => {
       setTasks(t.data || []);
-      setMembers((m.data || []).map(tm => ({ ...tm, avatar: avatarByName.get(tm.name.trim().toLowerCase()) ?? null })));
+      setMembers(m.data || []);
       setRoles(r.data || []);
       setMemberRoles(mr.data || []);
       setLoading(false);

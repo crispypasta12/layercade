@@ -6,6 +6,8 @@ import { supabase } from '../../lib/supabase';
 import { useCurrentMember } from '../../contexts/CurrentMemberContext';
 import { emptyQuip } from '../../lib/quips';
 import MemberAvatar from '../../components/admin/MemberAvatar';
+import { useUrlAction } from '../../lib/useUrlAction';
+import { calculateBalances, simplifyDebts } from '../../lib/expenseBalances';
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 const CATEGORIES = [
@@ -74,45 +76,6 @@ function calcSplits(members, selectedIds, total, splitType, customValues) {
   return result;
 }
 
-function calculateBalances(members, expenses, splits, settlements) {
-  const bal = {};
-  members.forEach((m) => { bal[m.id] = 0; });
-
-  expenses.forEach((exp) => {
-    const expSplits = splits.filter((s) => s.expense_id === exp.id);
-    expSplits.forEach((s) => { bal[s.member_id] = (bal[s.member_id] ?? 0) - Number(s.amount); });
-    if (exp.paid_by) bal[exp.paid_by] = (bal[exp.paid_by] ?? 0) + Number(exp.amount);
-  });
-
-  settlements.forEach((s) => {
-    if (s.from_member) bal[s.from_member] = (bal[s.from_member] ?? 0) + Number(s.amount);
-    if (s.to_member)   bal[s.to_member]   = (bal[s.to_member]   ?? 0) - Number(s.amount);
-  });
-
-  return bal;
-}
-
-function simplifyDebts(balances) {
-  const cred = [], debt = [];
-  Object.entries(balances).forEach(([id, amt]) => {
-    const a = Math.round(amt * 100) / 100;
-    if (a > 0.01)  cred.push({ id, a });
-    if (a < -0.01) debt.push({ id, a: -a });
-  });
-
-  const txns = [];
-  let ci = 0, di = 0;
-  while (ci < cred.length && di < debt.length) {
-    const amt = Math.round(Math.min(cred[ci].a, debt[di].a) * 100) / 100;
-    txns.push({ from: debt[di].id, to: cred[ci].id, amount: amt });
-    cred[ci].a -= amt;
-    debt[di].a -= amt;
-    if (cred[ci].a < 0.01) ci++;
-    if (debt[di].a < 0.01) di++;
-  }
-  return txns;
-}
-
 // ─── Shared style tokens ───────────────────────────────────────────────────────
 const inputBase = {
   width: '100%',
@@ -146,8 +109,8 @@ const errStyle = {
 };
 
 // ─── Avatar ────────────────────────────────────────────────────────────────────
-function Avatar({ member, size = 28 }) {
-  return <MemberAvatar member={member} size={size} />;
+function Avatar({ member, size = 28, tagged = false }) {
+  return <MemberAvatar member={member} size={size} tagged={tagged} />;
 }
 
 // ─── CategoryIcon ──────────────────────────────────────────────────────────────
@@ -652,8 +615,8 @@ function ExpenseCard({ expense, splits, members, currentMember, onEdit, onDelete
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           {payer && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <Avatar member={payer} size={18} />
-              <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: '#666' }}>
+              <Avatar member={payer} size={20} tagged />
+              <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: '#666', marginLeft: 3 }}>
                 paid
               </span>
             </div>
@@ -662,8 +625,8 @@ function ExpenseCard({ expense, splits, members, currentMember, onEdit, onDelete
           {/* Participant avatars */}
           <div style={{ display: 'flex', alignItems: 'center' }}>
             {participants.slice(0, 5).map((m, i) => (
-              <div key={m.id} style={{ marginLeft: i > 0 ? -6 : 0, zIndex: 10 - i }}>
-                <Avatar member={m} size={18} />
+              <div key={m.id} style={{ marginLeft: i > 0 ? -4 : 0, zIndex: 10 - i, position: 'relative' }}>
+                <Avatar member={m} size={20} tagged />
               </div>
             ))}
             {participants.length > 5 && (
@@ -743,6 +706,11 @@ export default function Expenses() {
 
   const [search,         setSearch]         = useState('');
   const [filterCategory, setFilterCategory] = useState('');
+
+  // ?new=1 (⌘K "Log expense") opens the add form once members have loaded.
+  useUrlAction('new', !loading, () => { setEditingExpense(null); setShowAddModal(true); });
+  // ?tab=balances (Dashboard "your desk") opens straight on balances.
+  useUrlAction('tab', true, (t) => { if (t === 'balances' || t === 'expenses') setTab(t); });
   const [filterMember,   setFilterMember]   = useState('');
   const [onlyMine,       setOnlyMine]       = useState(false);
 

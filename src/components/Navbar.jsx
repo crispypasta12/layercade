@@ -3,6 +3,7 @@ import { Link, NavLink } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useCartStore } from '../store/cartStore';
 import { PARENT_CATEGORIES } from '../lib/categories';
+import { shortcutLabel } from '../lib/platform';
 
 const SearchOverlay = lazy(() => import('./SearchOverlay'));
 const CartDrawer = lazy(() => import('./CartDrawer'));
@@ -253,7 +254,7 @@ export default function Navbar() {
           <span className="hidden md:flex absolute -bottom-5 left-1/2 -translate-x-1/2
                            font-technical text-[8px] text-stone-600 whitespace-nowrap
                            group-hover:text-stone-400 transition-colors">
-            ⌘K
+            {shortcutLabel('K')}
           </span>
         </button>
 

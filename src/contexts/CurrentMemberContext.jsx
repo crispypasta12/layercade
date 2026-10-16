@@ -15,13 +15,15 @@ export function CurrentMemberProvider({ session, children }) {
 
   const userId = session?.user?.id ?? null;
 
-  async function load(uid) {
+  // `quiet` re-fetches without flipping `loading`: ProtectedRoute swaps the
+  // whole page for a spinner while loading, which a profile edit must not do.
+  async function load(uid, { quiet = false } = {}) {
     if (!uid) {
       setMember(null);
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!quiet) setLoading(true);
     const { data, error } = await supabase
       .from('members')
       .select('*')
@@ -30,7 +32,7 @@ export function CurrentMemberProvider({ session, children }) {
 
     if (error) {
       setError(error);
-      setMember(null);
+      if (!quiet) setMember(null);
     } else {
       setError(null);
       setMember(data);
@@ -44,7 +46,7 @@ export function CurrentMemberProvider({ session, children }) {
 
   return (
     <CurrentMemberContext.Provider
-      value={{ member, loading, error, refresh: () => load(userId) }}
+      value={{ member, loading, error, refresh: () => load(userId, { quiet: true }) }}
     >
       {children}
     </CurrentMemberContext.Provider>

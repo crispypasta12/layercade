@@ -5,6 +5,7 @@ import DeleteConfirmModal from '../../components/admin/DeleteConfirmModal';
 import { supabase } from '../../lib/supabase';
 import { useCurrentMember } from '../../contexts/CurrentMemberContext';
 import { emptyQuip } from '../../lib/quips';
+import MemberAvatar from '../../components/admin/MemberAvatar';
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 const CATEGORIES = [
@@ -27,9 +28,6 @@ const SPLIT_TYPES = [
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 const fmt = (n) =>
   `৳${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-const initials = (name) =>
-  name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
 
 const todayStr = () => new Date().toISOString().split('T')[0];
 
@@ -149,21 +147,7 @@ const errStyle = {
 
 // ─── Avatar ────────────────────────────────────────────────────────────────────
 function Avatar({ member, size = 28 }) {
-  if (!member) return null;
-  return (
-    <div
-      style={{
-        width: size, height: size, borderRadius: 4,
-        background: member.color || '#555',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontFamily: "'Space Mono', monospace",
-        fontSize: Math.max(8, size * 0.35), fontWeight: 700,
-        color: '#fff', flexShrink: 0, userSelect: 'none',
-      }}
-    >
-      {initials(member.name)}
-    </div>
-  );
+  return <MemberAvatar member={member} size={size} />;
 }
 
 // ─── CategoryIcon ──────────────────────────────────────────────────────────────

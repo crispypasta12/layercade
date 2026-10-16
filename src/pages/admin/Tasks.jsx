@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import AdminNavbar from '../../components/admin/AdminNavbar';
 import { supabase } from '../../lib/supabase';
 import { pageTagline } from '../../lib/quips';
+import MemberAvatar from '../../components/admin/MemberAvatar';
 import { AnimatePresence } from 'framer-motion';
 
 // ─── Constants ────────────────────────────────────────────────
@@ -46,28 +47,10 @@ function useIsMobile() {
 
 // ─── Helpers ──────────────────────────────────────────────────
 
-function initials(name) {
-  return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
-}
-
 // ─── Avatar ───────────────────────────────────────────────────
 
 function Avatar({ member, size = 28 }) {
-  if (!member) return null;
-  return (
-    <div
-      title={member.name}
-      style={{
-        width: size, height: size, borderRadius: 3,
-        background: member.color,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: size * 0.36, fontWeight: 700, color: '#fff',
-        fontFamily: "'Space Mono', monospace", flexShrink: 0,
-      }}
-    >
-      {initials(member.name)}
-    </div>
-  );
+  return <MemberAvatar member={member} size={size} />;
 }
 
 // ─── Priority Badge ────────────────────────────────────────────
@@ -921,9 +904,13 @@ export default function Tasks() {
       supabase.from('team_members').select('*').order('created_at'),
       supabase.from('task_roles').select('*').order('label'),
       supabase.from('member_roles').select('*'),
-    ]).then(([t, m, r, mr]) => {
+      // Avatars live on public.members (the login table); tasks still point at
+      // team_members, so borrow each person's avatar by name.
+      supabase.from('members').select('name, avatar'),
+    ]).then(([t, m, r, mr, av]) => {
+      const avatarByName = new Map((av.data || []).map(a => [a.name.trim().toLowerCase(), a.avatar]));
       setTasks(t.data || []);
-      setMembers(m.data || []);
+      setMembers((m.data || []).map(tm => ({ ...tm, avatar: avatarByName.get(tm.name.trim().toLowerCase()) ?? null })));
       setRoles(r.data || []);
       setMemberRoles(mr.data || []);
       setLoading(false);

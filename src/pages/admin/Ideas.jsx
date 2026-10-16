@@ -8,6 +8,7 @@ import PhoneSaveHelp from '../../components/admin/PhoneSaveHelp';
 import { supabase } from '../../lib/supabase';
 import { useCurrentMember } from '../../contexts/CurrentMemberContext';
 import { pageTagline } from '../../lib/quips';
+import MemberAvatar from '../../components/admin/MemberAvatar';
 import {
   IDEA_STATUSES, IDEA_SOURCES, detectSource, normaliseUrl, extractUrl, titleFromUrl,
   firstImageFile, uploadIdeaImage, removeIdeaImage, normaliseTag,
@@ -31,10 +32,6 @@ function useIsMobile() {
 
 // ─── Helpers ──────────────────────────────────────────────────
 
-function initials(name) {
-  return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
-}
-
 function taka(n) {
   return `৳${Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 }
@@ -50,18 +47,7 @@ function timeAgo(iso) {
 
 function Avatar({ member, size = 20 }) {
   if (!member) return null;
-  return (
-    <div
-      title={`Added by ${member.name}`}
-      style={{
-        width: size, height: size, borderRadius: 3, background: member.color || '#555',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: size * 0.4, fontWeight: 700, color: '#fff', fontFamily: mono, flexShrink: 0,
-      }}
-    >
-      {initials(member.name)}
-    </div>
-  );
+  return <MemberAvatar member={member} size={size} title={`Added by ${member.name}`} />;
 }
 
 function SourceBadge({ source }) {
@@ -941,7 +927,7 @@ export default function Ideas() {
     let stale = false;
     Promise.all([
       supabase.from('ideas').select('*').order('position').order('created_at', { ascending: false }),
-      supabase.from('members').select('id, name, color'),
+      supabase.from('members').select('id, name, color, avatar'),
       supabase.from('idea_votes').select('idea_id, member_id'),
       supabase.from('products').select('id, name, slug, price, cost_price, created_at'),
       // For sales of listed ideas; cancelled and returned orders don't count.

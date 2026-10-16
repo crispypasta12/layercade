@@ -6,27 +6,27 @@ import { useCurrentMember } from '../../contexts/CurrentMemberContext';
 import { useAdminBadges } from '../../lib/useAdminBadges';
 import { GROUP_TAGLINES } from '../../lib/quips';
 import CommandPalette from './CommandPalette';
+import MemberAvatar from './MemberAvatar';
+import AvatarPicker from './AvatarPicker';
 
-function initials(name) {
-  return name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
-}
-
-function UserChip({ member, compact = false }) {
+// Clicking the chip opens the avatar picker — it is the one place every admin
+// sees their own face, so it is where they would look to change it.
+function UserChip({ member, compact = false, onClick }) {
   if (!member) return null;
   return (
-    <div className="flex items-center gap-2 px-2 py-1 border border-white/10 rounded-sm">
-      <div
-        className="flex items-center justify-center flex-shrink-0 rounded-sm"
-        style={{ width: 22, height: 22, background: member.color || '#555', fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 700, color: '#fff' }}
-      >
-        {initials(member.name)}
-      </div>
+    <button
+      type="button"
+      onClick={onClick}
+      title="Change avatar"
+      className="flex items-center gap-2 px-2 py-1 border border-white/10 rounded-sm hover:border-[#ff5500]/40 transition-colors"
+    >
+      <MemberAvatar member={member} size={22} title="" />
       {!compact && (
         <span className="font-technical text-[10px] uppercase tracking-widest text-stone-300 whitespace-nowrap">
           {member.name.split(' ')[0]}
         </span>
       )}
-    </div>
+    </button>
   );
 }
 
@@ -209,6 +209,7 @@ export default function AdminNavbar() {
   const [open, setOpen] = useState(false);          // mobile drawer
   const [openGroup, setOpenGroup] = useState(null); // desktop dropdown
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [avatarOpen, setAvatarOpen] = useState(false);
 
   const drawerRef = useRef(null);
   const navRef = useRef(null);
@@ -340,7 +341,7 @@ export default function AdminNavbar() {
 
           {/* Desktop user chip (with name) */}
           <div className="hidden lg:flex">
-            <UserChip member={member} />
+            <UserChip member={member} onClick={() => setAvatarOpen(true)} />
           </div>
 
           {/* Desktop logout */}
@@ -355,7 +356,7 @@ export default function AdminNavbar() {
 
           {/* Mobile user chip (compact, always visible) */}
           <div className="flex lg:hidden">
-            <UserChip member={member} compact />
+            <UserChip member={member} compact onClick={() => setAvatarOpen(true)} />
           </div>
 
           {/* Mobile hamburger */}
@@ -396,7 +397,7 @@ export default function AdminNavbar() {
             >
               Menu
             </span>
-            {member && <UserChip member={member} />}
+            {member && <UserChip member={member} onClick={() => { setOpen(false); setAvatarOpen(true); }} />}
           </div>
           <button
             onClick={() => setOpen(false)}
@@ -452,6 +453,9 @@ export default function AdminNavbar() {
       {/* Mounted only while open, so each ⌘K starts from a clean slate */}
       <AnimatePresence>
         {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
+      </AnimatePresence>
+      <AnimatePresence>
+        {avatarOpen && <AvatarPicker onClose={() => setAvatarOpen(false)} />}
       </AnimatePresence>
     </>
   );

@@ -1,10 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useCurrentMember } from '../../contexts/CurrentMemberContext';
 import { WELCOME, quip } from '../../lib/quips';
-
-function initials(name) {
-  return name.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
-}
+import MemberAvatar from './MemberAvatar';
 
 export default function WelcomeGuard({ children }) {
   const { member, loading } = useCurrentMember();
@@ -60,18 +57,7 @@ export default function WelcomeGuard({ children }) {
 
       {(phase === 'greet' || phase === 'fade') && member && (
         <div className="flex flex-col items-center gap-4">
-          <div
-            className="flex items-center justify-center rounded-sm"
-            style={{
-              width: 64, height: 64,
-              background: member.color || '#555',
-              fontFamily: "'Space Mono', monospace",
-              fontSize: 22, fontWeight: 700, color: '#fff',
-              boxShadow: `0 0 32px ${member.color || '#555'}55`,
-            }}
-          >
-            {initials(member.name)}
-          </div>
+          <MemberAvatar member={member} size={64} glow />
           <div className="text-center">
             <p className="font-technical text-[10px] text-stone-500 uppercase tracking-widest mb-1">
               {greeting}

@@ -55,13 +55,16 @@ function isPublicUrl(raw: string): URL | null {
   return u;
 }
 
-async function safeFetch(raw: string, accept: string): Promise<{ res: Response; url: URL } | null> {
+// Instagram only shows og tags to the crawlers it expects for link previews.
+const PREVIEW_BOT_UA = 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)';
+
+async function safeFetch(raw: string, accept: string, userAgent = USER_AGENT): Promise<{ res: Response; url: URL } | null> {
   let current = isPublicUrl(raw);
   for (let hop = 0; current && hop < 6; hop++) {
     const res = await fetch(current, {
       redirect: 'manual',
       signal: AbortSignal.timeout(TIMEOUT_MS),
-      headers: { 'User-Agent': USER_AGENT, Accept: accept, 'Accept-Language': 'en' },
+      headers: { 'User-Agent': userAgent, Accept: accept, 'Accept-Language': 'en' },
     });
     if (res.status >= 300 && res.status < 400) {
       const next = res.headers.get('location');
@@ -164,11 +167,112 @@ function describe(meta: Record<string, string>, source: Source) {
   };
 }
 
+/* ─── Site APIs ──────────────────────────────────────────────────────────────
+   The three sites the team saves from most don't give a usable preview from a
+   plain page fetch, so each gets its own route to the picture:
+   - MakerWorld's pages sit behind a Cloudflare challenge, but the model JSON
+     on api.bambulab.com doesn't.
+   - Pinterest pages are 1.5 MB+ of inline JSON with og:image near the end;
+     oEmbed returns the same picture in a few hundred bytes.
+   - Instagram serves link-preview crawlers the og tags; when it still hides
+     them, the post's embed page has the image.                              */
+
+type Preview = { title: string; author: string; description: string; image: string | null; url?: URL };
+
+async function fetchJson(url: string): Promise<any | null> {
+  const r = await safeFetch(url, 'application/json');
+  if (!r?.res.ok) { await r?.res.body?.cancel(); return null; }
+  const bytes = await readCapped(r.res, MAX_HTML_BYTES);
+  try { return JSON.parse(new TextDecoder().decode(bytes ?? new Uint8Array())); } catch { return null; }
+}
+
+async function fetchHtml(url: string, userAgent?: string): Promise<{ html: string; url: URL } | null> {
+  const r = await safeFetch(url, 'text/html,application/xhtml+xml', userAgent);
+  if (!r?.res.ok) { await r?.res.body?.cancel(); return null; }
+  const bytes = await readCapped(r.res, MAX_HTML_BYTES);
+  return { html: new TextDecoder().decode(bytes ?? new Uint8Array()), url: r.url };
+}
+
+async function makerworldPreview(url: URL): Promise<Preview | null> {
+  const id = url.pathname.match(/\/models\/(\d+)/)?.[1];
+  if (!id) return null;
+  const d = await fetchJson(`https://api.bambulab.com/v1/design-service/design/${id}`);
+  if (!d?.title) return null;
+  // Covers are full-size PNGs served as octet-stream; the CDN can resize them.
+  const cover = d.coverUrl || d.coverPortrait || d.coverLandscape || null;
+  return {
+    title: d.titleTranslated || d.title,   // English when the original isn't
+    author: d.designCreator?.name || '',
+    description: '',
+    image: cover ? `${cover}?x-oss-process=image/resize,w_1000/format,webp` : null,
+  };
+}
+
+async function pinterestPreview(url: URL): Promise<Preview | null> {
+  // pin.it short links need resolving to /pin/<id>/ before oEmbed knows them.
+  let pinUrl = url;
+  if (!/\/pin\/\d+/.test(url.pathname)) {
+    const r = await safeFetch(url.toString(), 'text/html');
+    await r?.res.body?.cancel();
+    if (!r || !/\/pin\/\d+/.test(r.url.pathname)) return null;
+    pinUrl = r.url;
+  }
+  const id = pinUrl.pathname.match(/\/pin\/(\d+)/)![1];
+  const canonical = new URL(`https://www.pinterest.com/pin/${id}/`);
+  const o = await fetchJson(`https://www.pinterest.com/oembed.json?url=${encodeURIComponent(canonical.toString())}`);
+  if (!o) return null;
+  return {
+    title: o.title || '',
+    author: o.author_name || '',
+    description: '',
+    // oEmbed hands back the 236px thumbnail; the same file exists at 736px.
+    image: o.thumbnail_url?.replace('/236x/', '/736x/') || null,
+    url: canonical,
+  };
+}
+
+async function instagramEmbedImage(url: URL): Promise<string | null> {
+  const m = url.pathname.match(/\/(p|reel|reels|tv)\/([A-Za-z0-9_-]+)/);
+  if (!m) return null;
+  const page = await fetchHtml(`https://www.instagram.com/p/${m[2]}/embed/captioned/`);
+  const src = page?.html.match(/class="EmbeddedMediaImage"[^>]*\bsrc="([^"]+)"/)?.[1];
+  return src ? decodeEntities(src) : null;
+}
+
 /* ─── Handler ────────────────────────────────────────────────────────────── */
+
+// Sniff the type from the bytes: CDNs often send application/octet-stream.
+function imageType(data: Uint8Array): string | null {
+  const b = data;
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'image/png';
+  if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) return 'image/gif';
+  if (b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 &&
+      b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return 'image/webp';
+  return null;
+}
 
 const EXT: Record<string, string> = {
   'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif',
 };
+
+// Copy a remote thumbnail into our bucket. Returns null if it couldn't be read.
+async function storeImage(supabase: ReturnType<typeof createClient>, remote: string): Promise<string | null> {
+  try {
+    const img = await safeFetch(remote, 'image/*');
+    if (!img?.res.ok) { await img?.res.body?.cancel(); return null; }
+    const data = await readCapped(img.res, MAX_IMAGE_BYTES);
+    if (!data || data.length === 0 || data.length >= MAX_IMAGE_BYTES) return null;
+    const type = imageType(data);
+    if (!type) return null;
+    const path = `${crypto.randomUUID()}.${EXT[type]}`;
+    const { error } = await supabase.storage.from('idea-images').upload(path, data, { contentType: type });
+    return error ? null : supabase.storage.from('idea-images').getPublicUrl(path).data.publicUrl;
+  } catch (err) {
+    console.error('[idea-preview] thumbnail copy failed:', err);
+    return null;
+  }
+}
 
 Deno.serve(async (req) => {
   const origin = req.headers.get('Origin');
@@ -201,47 +305,52 @@ Deno.serve(async (req) => {
   const fallback = { url: pasted, source: detectSource(new URL(pasted).hostname), title: '', author: '', description: '', image_url: null as string | null };
 
   try {
-    const page = await safeFetch(pasted, 'text/html,application/xhtml+xml');
-    if (!page || !page.res.ok) {
-      await page?.res.body?.cancel();
-      return json({ ...fallback, partial: true }, 200);
-    }
+    const pastedUrl = new URL(pasted);
+    let preview: Preview | null = null;
 
-    const bytes = await readCapped(page.res, MAX_HTML_BYTES);
-    const html = new TextDecoder().decode(bytes ?? new Uint8Array());
-    const meta = parseMeta(html);
+    // Site APIs first; any of them failing drops through to the page's og tags.
+    if (fallback.source === 'makerworld') preview = await makerworldPreview(pastedUrl).catch(() => null);
+    if (fallback.source === 'pinterest') preview = await pinterestPreview(pastedUrl).catch(() => null);
 
-    const canonical = isPublicUrl(meta['og:url'] ? new URL(meta['og:url'], page.url).toString() : '') ?? page.url;
-    const source = detectSource(canonical.hostname);
-    const { title, author, description } = describe(meta, source);
-
-    // Thumbnail: copy into our bucket; fall back to the remote link if that fails.
-    let image_url: string | null = null;
-    const remoteImage = meta['og:image:secure_url'] || meta['og:image'] || meta['twitter:image'] || meta['twitter:image:src'];
-    if (remoteImage) {
-      const absolute = new URL(remoteImage, page.url).toString();
-      image_url = absolute;
-      try {
-        const img = await safeFetch(absolute, 'image/*');
-        const type = img?.res.headers.get('content-type')?.split(';')[0].trim() ?? '';
-        if (img?.res.ok && EXT[type]) {
-          const data = await readCapped(img.res, MAX_IMAGE_BYTES);
-          if (data && data.length > 0 && data.length < MAX_IMAGE_BYTES) {
-            const path = `${crypto.randomUUID()}.${EXT[type]}`;
-            const { error } = await supabase.storage.from('idea-images').upload(path, data, { contentType: type });
-            if (!error) image_url = supabase.storage.from('idea-images').getPublicUrl(path).data.publicUrl;
-          }
-        } else {
-          await img?.res.body?.cancel();
-        }
-      } catch (err) {
-        console.error('[idea-preview] thumbnail copy failed:', err);
+    if (!preview?.image) {
+      const ua = fallback.source === 'instagram' ? PREVIEW_BOT_UA : USER_AGENT;
+      const page = await fetchHtml(pasted, ua);
+      if (page) {
+        const meta = parseMeta(page.html);
+        const canonical = isPublicUrl(meta['og:url'] ? new URL(meta['og:url'], page.url).toString() : '') ?? page.url;
+        const remote = meta['og:image:secure_url'] || meta['og:image'] || meta['twitter:image'] || meta['twitter:image:src'];
+        const fromPage = describe(meta, detectSource(canonical.hostname));
+        preview = {
+          title: preview?.title || fromPage.title,
+          author: preview?.author || fromPage.author,
+          description: preview?.description || fromPage.description,
+          image: remote ? new URL(remote, page.url).toString() : null,
+          url: preview?.url ?? canonical,
+        };
       }
     }
 
+    if (fallback.source === 'instagram' && !preview?.image) {
+      const image = await instagramEmbedImage(pastedUrl).catch(() => null);
+      if (image) preview = { ...(preview ?? { title: '', author: '', description: '' }), image };
+    }
+
+    if (!preview) return json({ ...fallback, partial: true }, 200);
+
+    const finalUrl = preview.url ?? pastedUrl;
+    const { title, author, description } = {
+      title: truncate(preview.title, 140),
+      author: truncate(preview.author.replace(/^@/, ''), 80),
+      description: truncate(preview.description, 400),
+    };
+
+    // Copy the thumbnail into our bucket (CDN links are signed and expire);
+    // keep the remote link only if the copy fails.
+    const image_url = preview.image ? (await storeImage(supabase, preview.image)) ?? preview.image : null;
+
     return json({
-      url: canonical.toString(),
-      source,
+      url: finalUrl.toString(),
+      source: detectSource(finalUrl.hostname),
       title,
       author,
       description,

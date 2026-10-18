@@ -16,6 +16,9 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { supabase } from '../../lib/supabase';
+import {
+  CLOUDINARY_UNSIGNED_LIMIT, compressImage, formatBytes, uploadErrorFor, useCompressUploads,
+} from '../../lib/imageCompression';
 import AdminNavbar from '../../components/admin/AdminNavbar';
 import PageTagline from '../../components/admin/PageTagline';
 import { emptyQuip } from '../../lib/quips';
@@ -23,7 +26,8 @@ import Toast from '../../components/Toast';
 
 const CLOUD_NAME    = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
+// Pre-compression cap only — images are shrunk in the browser before upload.
+const MAX_FILE_SIZE = 50 * 1024 * 1024;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 /* ─── Helpers ─────────────────────────────────────────────────────── */
@@ -61,6 +65,8 @@ function CategoryFormModal({ category, allCategories, defaultParentId, onClose, 
 
   const parentOptions = allCategories.filter((c) => c.parent_id === null && c.id !== category?.id);
   const [uploading,   setUploading]   = useState(false);
+  const [compressing, setCompressing] = useState(false);
+  const [compressUploads, setCompressUploads] = useCompressUploads();
   const [uploadPct,   setUploadPct]   = useState(0);
   const [uploadError, setUploadError] = useState(null);
   const fileInputRef = useRef(null);
@@ -69,7 +75,7 @@ function CategoryFormModal({ category, allCategories, defaultParentId, onClose, 
   const [saving,    setSaving]    = useState(false);
   const [saveError, setSaveError] = useState(null);
 
-  const handleFileSelect = (e) => {
+  const handleFileSelect = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
@@ -79,7 +85,7 @@ function CategoryFormModal({ category, allCategories, defaultParentId, onClose, 
       return;
     }
     if (file.size > MAX_FILE_SIZE) {
-      setUploadError('File must be under 5 MB.');
+      setUploadError('File must be under 50 MB.');
       return;
     }
 
@@ -87,8 +93,22 @@ function CategoryFormModal({ category, allCategories, defaultParentId, onClose, 
     setUploading(true);
     setUploadPct(0);
 
+    let upload = file;
+    if (compressUploads) {
+      setCompressing(true);
+      try {
+        upload = await compressImage(file);
+      } catch {
+        setUploading(false);
+        setCompressing(false);
+        setUploadError('Could not read that image. Try a different file.');
+        return;
+      }
+      setCompressing(false);
+    }
+
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', upload);
     formData.append('upload_preset', UPLOAD_PRESET);
     formData.append('folder', 'layercade/categories');
 
@@ -101,15 +121,17 @@ function CategoryFormModal({ category, allCategories, defaultParentId, onClose, 
 
     xhr.onload = () => {
       setUploading(false);
+      setCompressing(false);
       if (xhr.status === 200) {
         setImageUrl(JSON.parse(xhr.responseText).secure_url);
       } else {
-        setUploadError('Upload failed. Check your Cloudinary upload preset.');
+        setUploadError(uploadErrorFor(xhr, upload, compressUploads));
       }
     };
 
     xhr.onerror = () => {
       setUploading(false);
+      setCompressing(false);
       setUploadError('Network error during upload. Please try again.');
     };
 
@@ -291,10 +313,13 @@ function CategoryFormModal({ category, allCategories, defaultParentId, onClose, 
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                 </svg>
                 <p className="font-technical text-[10px] text-stone-400 uppercase tracking-widest">
-                  Uploading… {uploadPct}%
+                  {compressing ? 'Compressing…' : `Uploading… ${uploadPct}%`}
                 </p>
                 <div className="w-full h-1 bg-white/10 overflow-hidden rounded">
-                  <div className="h-full bg-[#ff5500] transition-all duration-200" style={{ width: `${uploadPct}%` }} />
+                  <div
+                    className="h-full bg-[#ff5500] transition-all duration-200"
+                    style={{ width: compressing ? '100%' : `${uploadPct}%` }}
+                  />
                 </div>
               </div>
             )}
@@ -323,8 +348,25 @@ function CategoryFormModal({ category, allCategories, defaultParentId, onClose, 
               <span className="material-symbols-outlined" style={{ fontSize: 15 }}>image</span>
               {imageUrl ? 'Replace Image' : 'Upload Image'}
             </button>
+
+            <label className="flex items-center gap-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={compressUploads}
+                onChange={(e) => setCompressUploads(e.target.checked)}
+                disabled={saving || uploading}
+                className="w-4 h-4 accent-[#ff5500] flex-shrink-0 disabled:cursor-not-allowed"
+              />
+              <span className="font-technical text-[10px] uppercase tracking-widest text-stone-400 group-hover:text-stone-200 transition-colors select-none">
+                Compress before upload
+              </span>
+            </label>
+
             <p className="font-technical text-[10px] text-stone-600">
-              JPG, PNG or WebP · max 5 MB · shown as card background on the shop page
+              {compressUploads
+                ? 'JPG, PNG or WebP · shrunk to 2000px WebP before upload'
+                : `JPG, PNG or WebP · uploaded untouched — Cloudinary refuses unsigned files over ${formatBytes(CLOUDINARY_UNSIGNED_LIMIT)}`}
+              {' · shown as card background on the shop page'}
             </p>
           </div>
 

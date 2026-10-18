@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  CLOUDINARY_UNSIGNED_LIMIT, compressImage, formatBytes, uploadErrorFor, useCompressUploads,
+} from '../../lib/imageCompression';
 import { parseProductImages } from '../../lib/productImages';
 import { supabase } from '../../lib/supabase';
 import { formatDealRemaining, getDealInfo, useNow } from '../../lib/deals';
@@ -18,7 +21,9 @@ const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
 const MAX_IMAGE_COUNT = 6;
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
+// Pre-compression cap. Camera JPEGs are 20-30 MB and get shrunk in the browser
+// before upload, so this only exists to refuse something absurd.
+const MAX_FILE_SIZE = 50 * 1024 * 1024;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 function generateSlug(name) {
@@ -108,7 +113,7 @@ function ColorSwatchPicker({ colors, selectedHex, onSelect, onClose }) {
 
 function VariantRow({
   variant, index, total, globalColors,
-  uploading, uploadProgress, uploadError,
+  uploading, uploadProgress, uploadStage, uploadError,
   onChange, onRemove, onMoveUp, onMoveDown, onImageUpload,
   disabled,
 }) {
@@ -230,7 +235,9 @@ function VariantRow({
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
               </svg>
-              <span className="font-technical text-[9px] text-stone-500">{uploadProgress}%</span>
+              <span className="font-technical text-[9px] text-stone-500">
+                {uploadStage === 'compressing' ? '···' : `${uploadProgress}%`}
+              </span>
             </div>
           ) : (
             <button
@@ -317,6 +324,9 @@ export default function ProductFormModal({ product, prefill, onClose, onSuccess 
   // Product-level image upload
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
+  const [uploadStage, setUploadStage] = useState(null);
+  const [uploadNote, setUploadNote] = useState(null);
+  const [compressUploads, setCompressUploads] = useCompressUploads();
   const [uploadError, setUploadError] = useState(null);
 
   // Color variants
@@ -325,6 +335,7 @@ export default function ProductFormModal({ product, prefill, onClose, onSuccess 
   const [originalVariantIds, setOriginalVariantIds] = useState([]);
   const [variantUploading, setVariantUploading] = useState({});
   const [variantUploadProgress, setVariantUploadProgress] = useState({});
+  const [variantUploadStage, setVariantUploadStage] = useState({});
   const [variantUploadError, setVariantUploadError] = useState({});
   const variantFileInputRef = useRef(null);
   const [pendingVariantIdx, setPendingVariantIdx] = useState(null);
@@ -423,7 +434,7 @@ export default function ProductFormModal({ product, prefill, onClose, onSuccess 
     });
   };
 
-  const handleVariantFileSelect = (e) => {
+  const handleVariantFileSelect = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file || pendingVariantIdx === null) return;
@@ -435,17 +446,31 @@ export default function ProductFormModal({ product, prefill, onClose, onSuccess 
       return;
     }
     if (file.size > MAX_FILE_SIZE) {
-      setVariantUploadError((prev) => ({ ...prev, [idx]: 'Max 5 MB.' }));
+      setVariantUploadError((prev) => ({ ...prev, [idx]: 'Max 50 MB.' }));
       return;
     }
 
     setVariantUploadError((prev) => ({ ...prev, [idx]: null }));
     setVariantUploading((prev) => ({ ...prev, [idx]: true }));
     setVariantUploadProgress((prev) => ({ ...prev, [idx]: 0 }));
+    setVariantUploadStage((prev) => ({ ...prev, [idx]: compressUploads ? 'compressing' : 'uploading' }));
+
+    let upload = file;
+    if (compressUploads) {
+      try {
+        upload = await compressImage(file);
+      } catch {
+        setVariantUploading((prev) => ({ ...prev, [idx]: false }));
+        setVariantUploadStage((prev) => ({ ...prev, [idx]: null }));
+        setVariantUploadError((prev) => ({ ...prev, [idx]: 'Could not read that image.' }));
+        return;
+      }
+      setVariantUploadStage((prev) => ({ ...prev, [idx]: 'uploading' }));
+    }
 
     const folder = `layercade/products/${categoryToFolder(category)}/variants`;
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', upload);
     formData.append('upload_preset', UPLOAD_PRESET);
     formData.append('folder', folder);
 
@@ -463,16 +488,21 @@ export default function ProductFormModal({ product, prefill, onClose, onSuccess 
 
     xhr.onload = () => {
       setVariantUploading((prev) => ({ ...prev, [idx]: false }));
+      setVariantUploadStage((prev) => ({ ...prev, [idx]: null }));
       if (xhr.status === 200) {
         const data = JSON.parse(xhr.responseText);
         updateVariant(idx, { image: data.secure_url, images: [data.secure_url] });
       } else {
-        setVariantUploadError((prev) => ({ ...prev, [idx]: 'Upload failed.' }));
+        setVariantUploadError((prev) => ({
+          ...prev,
+          [idx]: uploadErrorFor(xhr, upload, compressUploads),
+        }));
       }
     };
 
     xhr.onerror = () => {
       setVariantUploading((prev) => ({ ...prev, [idx]: false }));
+      setVariantUploadStage((prev) => ({ ...prev, [idx]: null }));
       setVariantUploadError((prev) => ({ ...prev, [idx]: 'Network error.' }));
     };
 
@@ -494,7 +524,7 @@ export default function ProductFormModal({ product, prefill, onClose, onSuccess 
     setFieldErrors((prev) => ({ ...prev, slug: err ?? undefined }));
   };
 
-  const handleFileSelect = (e) => {
+  const handleFileSelect = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
@@ -508,17 +538,37 @@ export default function ProductFormModal({ product, prefill, onClose, onSuccess 
       return;
     }
     if (file.size > MAX_FILE_SIZE) {
-      setUploadError('File must be under 5 MB.');
+      setUploadError('File must be under 50 MB.');
       return;
     }
 
     setUploadError(null);
+    setUploadNote(null);
     setUploading(true);
     setUploadProgress(0);
+    setUploadStage(compressUploads ? 'compressing' : 'uploading');
+
+    let upload = file;
+    if (compressUploads) {
+      try {
+        upload = await compressImage(file);
+      } catch {
+        setUploading(false);
+        setUploadStage(null);
+        setUploadError('Could not read that image. Try a different file.');
+        return;
+      }
+      if (upload.size < file.size) {
+        setUploadNote(`Compressed ${formatBytes(file.size)} → ${formatBytes(upload.size)}`);
+      }
+      setUploadStage('uploading');
+    } else {
+      setUploadNote(`Uploaded at full size · ${formatBytes(file.size)}`);
+    }
 
     const folder = `layercade/products/${categoryToFolder(category)}`;
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', upload);
     formData.append('upload_preset', UPLOAD_PRESET);
     formData.append('folder', folder);
 
@@ -533,17 +583,21 @@ export default function ProductFormModal({ product, prefill, onClose, onSuccess 
 
     xhr.onload = () => {
       setUploading(false);
+      setUploadStage(null);
       if (xhr.status === 200) {
         const data = JSON.parse(xhr.responseText);
         setImageUrls((prev) => [...prev, data.secure_url]);
         setFieldErrors((prev) => ({ ...prev, image: undefined }));
       } else {
-        setUploadError('Upload failed. Check your Cloudinary upload preset.');
+        setUploadNote(null);
+        setUploadError(uploadErrorFor(xhr, upload, compressUploads));
       }
     };
 
     xhr.onerror = () => {
       setUploading(false);
+      setUploadStage(null);
+      setUploadNote(null);
       setUploadError('Network error during upload. Please try again.');
     };
 
@@ -1025,17 +1079,17 @@ export default function ProductFormModal({ product, prefill, onClose, onSuccess 
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                       </svg>
                       <p className="font-technical text-[10px] text-stone-400 uppercase tracking-widest">
-                        {uploadProgress}%
+                        {uploadStage === 'compressing' ? '···' : `${uploadProgress}%`}
                       </p>
                       <div className="w-3/4 h-1 bg-white/10 overflow-hidden">
                         <div
                           className="h-full bg-[#ff5500] transition-all duration-200"
-                          style={{ width: `${uploadProgress}%` }}
+                          style={{ width: uploadStage === 'compressing' ? '100%' : `${uploadProgress}%` }}
                         />
                       </div>
                     </div>
                     <p className="mt-2 font-technical text-[10px] uppercase tracking-widest text-stone-600 text-center">
-                      Uploading…
+                      {uploadStage === 'compressing' ? 'Compressing…' : 'Uploading…'}
                     </p>
                   </div>
                 )}
@@ -1064,9 +1118,27 @@ export default function ProductFormModal({ product, prefill, onClose, onSuccess 
                   : 'Select Image'}
             </button>
 
+            <label className="flex items-center gap-3 cursor-pointer group mt-3">
+              <input
+                type="checkbox"
+                checked={compressUploads}
+                onChange={(e) => setCompressUploads(e.target.checked)}
+                disabled={isLocked}
+                className="w-4 h-4 accent-[#ff5500] flex-shrink-0 disabled:cursor-not-allowed"
+              />
+              <span className="font-technical text-[10px] uppercase tracking-widest text-stone-400 group-hover:text-stone-200 transition-colors select-none">
+                Compress before upload
+              </span>
+            </label>
+
             <p className="font-technical text-[10px] text-stone-700 mt-1">
-              JPG, PNG or WebP · max 5 MB · up to 6 images · uploads immediately on selection
+              {compressUploads
+                ? 'JPG, PNG or WebP · up to 6 images · camera shots are shrunk to 2000px WebP here, so pick the full-size original'
+                : `JPG, PNG or WebP · up to 6 images · uploaded untouched — Cloudinary refuses unsigned files over ${formatBytes(CLOUDINARY_UNSIGNED_LIMIT)}`}
             </p>
+            {uploadNote && (
+              <p className="font-technical text-[10px] text-stone-500 mt-1">{uploadNote}</p>
+            )}
           </Field>
 
           <div className="space-y-3">
@@ -1154,6 +1226,7 @@ export default function ProductFormModal({ product, prefill, onClose, onSuccess 
                         globalColors={globalColors}
                         uploading={!!variantUploading[i]}
                         uploadProgress={variantUploadProgress[i] ?? 0}
+                        uploadStage={variantUploadStage[i] ?? null}
                         uploadError={variantUploadError[i] ?? null}
                         onChange={(patch) => updateVariant(i, patch)}
                         onRemove={() => removeVariant(i)}

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { compressImage } from '../lib/imageCompression';
 import { REVIEWS_QUIP, REVIEWS_EMPTY_QUIP } from '../lib/voice';
 
 const CLOUDINARY_URL = `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`;
@@ -177,9 +178,13 @@ function SubmitForm({ productId, onSubmitted }) {
     setPreviews(next.map((f) => URL.createObjectURL(f)));
   };
 
+  // Phone photos are several MB each and four can be attached at once, so
+  // shrink them before they go over the wire. Review shots are only ever seen
+  // in a card or a lightbox, so 1600px is more than enough.
   const uploadToCloudinary = async (file) => {
+    const upload = await compressImage(file, { maxEdge: 1600, targetBytes: 300 * 1024 });
     const data = new FormData();
-    data.append('file', file);
+    data.append('file', upload);
     data.append('upload_preset', UPLOAD_PRESET);
     data.append('folder', 'reviews');
     const res = await fetch(CLOUDINARY_URL, { method: 'POST', body: data });

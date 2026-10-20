@@ -33,6 +33,7 @@ export const PAGE_TAGLINES = {
   '/admin/ideas':      ['A graveyard with good intentions'],
   '/admin/expenses':   ['The money, and where it went instead'],
   '/admin/reviews':    ['Public judgement, awaiting your approval'],
+  '/admin/promos':     ['The first thing they see, before they decide to leave'],
 };
 
 /* ─── Empty states ────────────────────────────────────────────────── */

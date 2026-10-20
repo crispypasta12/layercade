@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FloatingPaths } from '@/components/ui/background-paths';
 import ProductCard, { fadeUp } from '../components/ProductCard';
-import { FAQ_JOKE, HERO_QUIP } from '../lib/voice';
+import { FAQ_JOKE } from '../lib/voice';
+import HeroCarousel from '../components/hero/HeroCarousel';
 
 /* ─── Constants ──────────────────────────────────────────────── */
-const TW_WORDS = ['KEYCAPS', 'DIORAMAS', 'DESK GEAR', 'ROOM DECOR', 'YOUR WEIRD IDEA'];
-
 
 const REVIEWS = [
   {
@@ -60,31 +58,6 @@ export default function LandingPage() {
   const location = useLocation();
   const [allCategories, setAllCategories] = useState([]);
 
-  /* Typewriter */
-  const [twText,    setTwText]    = useState('');
-  const [twWordIdx, setTwWordIdx] = useState(0);
-  const [twDelete,  setTwDelete]  = useState(false);
-
-  useEffect(() => {
-    const word = TW_WORDS[twWordIdx];
-    let timer;
-    if (!twDelete) {
-      if (twText.length < word.length) {
-        timer = setTimeout(() => setTwText(word.slice(0, twText.length + 1)), 90);
-      } else {
-        timer = setTimeout(() => setTwDelete(true), 1400);
-      }
-    } else {
-      if (twText.length > 0) {
-        timer = setTimeout(() => setTwText(word.slice(0, twText.length - 1)), 60);
-      } else {
-        setTwDelete(false);
-        setTwWordIdx((i) => (i + 1) % TW_WORDS.length);
-      }
-    }
-    return () => clearTimeout(timer);
-  }, [twText, twWordIdx, twDelete]);
-
   /* Products from Supabase */
   const [featuredProducts, setFeaturedProducts] = useState([]);
   const [newProducts,      setNewProducts]      = useState([]);
@@ -135,72 +108,7 @@ export default function LandingPage() {
 
   return (
     <main>
-      {/* ── 01 HERO ──────────────────────────────────────────────── */}
-      <section className="relative md:min-h-[50vh] flex flex-col items-center justify-center orange-grid overflow-hidden pt-[calc(36px+80px+2.5rem)] pb-12">
-        <div className="absolute inset-0 text-[#ff5500]">
-          <FloatingPaths position={1} />
-          <FloatingPaths position={-1} />
-        </div>
-
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#080808]/60 to-[#080808] pointer-events-none" />
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-[#ff5500] blur-[140px] opacity-15 pointer-events-none" />
-
-        <div className="relative z-20 text-center px-4">
-          <h1 className="font-headline text-5xl md:text-7xl leading-none tracking-tighter text-white">
-            PRECISION.<br />LAYER BY LAYER.
-          </h1>
-
-          <div
-            className="font-technical text-sm md:text-2xl mt-4 flex items-center justify-center gap-2
-                        tracking-[0.15em] md:tracking-[0.2em] uppercase whitespace-nowrap"
-          >
-            <span style={{ color: '#555' }}>NOW PRINTING:</span>
-            {/* Fixed width (longest word) so the line doesn't shift while typing */}
-            <span className="inline-block min-w-[15ch] text-left text-[#ff5500] font-bold typewriter-cursor">{twText}</span>
-          </div>
-
-          <div className="flex flex-row gap-3 md:gap-6 mt-8 justify-center">
-            <Link
-              to="/shop"
-              className="clip-parallelogram bg-[#ff5500] text-white px-7 py-3 md:px-12 md:py-4 font-headline text-xl md:text-3xl
-                         hover:shadow-[0_0_30px_rgba(255,85,0,0.5)] transition-all flex items-center justify-center"
-            >
-              Shop Now
-            </Link>
-            <Link
-              to="/quote"
-              className="clip-parallelogram border-2 border-orange-500/50 text-orange-500 bg-orange-500/5
-                         px-6 py-3 md:px-10 md:py-4 font-headline text-xl md:text-2xl hover:bg-orange-500/10 transition-all
-                         flex items-center justify-center"
-            >
-              Get a Quote
-            </Link>
-          </div>
-
-          {/* Trust stats strip */}
-          <div className="mt-8 md:mt-10 grid grid-cols-2 gap-y-4 sm:flex sm:flex-wrap items-center justify-center sm:gap-x-8 sm:gap-y-3">
-            {[
-              { stat: 'Cash', label: 'On Delivery' },
-              { stat: 'Free Delivery', label: 'Over 1,000৳ in Dhaka' },
-              { stat: '3–5 Days', label: 'Turnaround' },
-              { stat: 'Custom', label: 'Orders' },
-            ].map(({ stat, label }, i) => (
-              <div key={label} className="flex items-center justify-center gap-4">
-                <div className="text-center">
-                  <span className="font-headline text-xl text-white block leading-none">{stat}</span>
-                  <span className="font-technical text-[9px] uppercase tracking-[0.2em] text-stone-500">{label}</span>
-                </div>
-                {i < 3 && <span className="text-white/10 font-technical select-none hidden sm:block">|</span>}
-              </div>
-            ))}
-          </div>
-
-          <p className="mt-6 font-technical text-[10px] text-stone-600 tracking-[0.1em]">
-            {HERO_QUIP}
-          </p>
-        </div>
-
-      </section>
+      <HeroCarousel />
 
       {/* ── 03 COLLECTIONS ───────────────────────────────────── */}
       <section className="py-16 px-8 max-w-7xl mx-auto" id="collections">

@@ -56,6 +56,7 @@ const NAV_GROUPS = [
       { label: 'Products',   to: '/admin/products',   icon: 'inventory_2' },
       { label: 'Categories', to: '/admin/categories', icon: 'category' },
       { label: 'Reviews',    to: '/admin/reviews',    icon: 'rate_review', badge: 'reviews' },
+      { label: 'Hero Slides', to: '/admin/promos',   icon: 'view_carousel' },
     ],
   },
   {

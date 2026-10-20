@@ -27,6 +27,7 @@ const DESTINATIONS = [
   { id: 'nav-products',   label: 'Products',        to: '/admin/products',   icon: 'inventory_2',   group: 'The Bait',    keywords: 'catalogue listings shop stock' },
   { id: 'nav-categories', label: 'Categories',      to: '/admin/categories', icon: 'category',      group: 'The Bait',    keywords: 'collections groups taxonomy' },
   { id: 'nav-reviews',    label: 'Reviews',         to: '/admin/reviews',    icon: 'rate_review',   group: 'The Bait',    keywords: 'ratings feedback moderation' },
+  { id: 'nav-promos',     label: 'Hero Slides',     to: '/admin/promos',     icon: 'view_carousel', group: 'The Bait',    keywords: 'banner carousel hero promo slide campaign' },
   { id: 'nav-inventory',  label: 'Inventory',       to: '/admin/inventory',  icon: 'inventory',     group: 'The Grind',   keywords: 'filament spools colours ams stock' },
   { id: 'nav-tasks',      label: 'Tasks',           to: '/admin/tasks',      icon: 'task_alt',      group: 'The Grind',   keywords: 'todo board kanban assignments' },
   { id: 'nav-ideas',      label: 'Ideas',           to: '/admin/ideas',      icon: 'lightbulb',     group: 'The Grind',   keywords: 'inbox makerworld inspiration backlog' },

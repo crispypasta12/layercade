@@ -25,6 +25,7 @@ const AdminDashboard = lazy(() => import('./pages/admin/Dashboard'));
 const AdminOrders = lazy(() => import('./pages/admin/Orders'));
 const AdminProducts = lazy(() => import('./pages/admin/Products'));
 const AdminCategories = lazy(() => import('./pages/admin/Categories'));
+const AdminPromos     = lazy(() => import('./pages/admin/Promos'));
 const CostCalculator = lazy(() => import('./pages/admin/CostCalculator'));
 const InvoiceMaker = lazy(() => import('./pages/admin/InvoiceMaker'));
 const AdminTasks = lazy(() => import('./pages/admin/Tasks'));
@@ -124,6 +125,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <AdminCategories />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/promos"
+          element={
+            <ProtectedRoute>
+              <AdminPromos />
             </ProtectedRoute>
           }
         />

@@ -14,6 +14,7 @@ export const SUB_CATEGORIES = [
   { name: 'Keycaps',               slug: 'keycaps',               parentSlug: 'gaming-setup' },
   { name: 'Desk Accessories',      slug: 'desk-accessories',      parentSlug: 'gaming-setup' },
   { name: 'RGB Lights & Accessories', slug: 'rgb-lights-accessories', parentSlug: 'gaming-setup' },
+  { name: 'GTA VI',                slug: 'gta-vi',                parentSlug: 'gaming-setup' },
   // Home & Office Decor
   { name: 'Room Decor',            slug: 'room-decor',            parentSlug: 'home-office-decor' },
   { name: 'Flower Vases',          slug: 'flower-vases',          parentSlug: 'home-office-decor' },

@@ -128,28 +128,29 @@ export default function ProductCard({ product: baseProduct, location }) {
             );
           })()}
 
-          {/* Stars */}
-          <div className="flex items-center gap-1 text-orange-500 text-xs">
-            <div className="flex gap-0.5">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <span
-                  key={star}
-                  className="material-symbols-outlined"
-                  style={{
-                    fontSize: 14,
-                    fontVariationSettings: `'FILL' ${star <= product.rating ? 1 : 0}`,
-                  }}
-                >
-                  star
-                </span>
-              ))}
-            </div>
-            {product.reviewCount > 0 && (
+          {/* Stars — only once there's something to show. Five hollow stars
+              reads as "rated zero", which is worse than saying nothing. */}
+          {product.reviewCount > 0 && (
+            <div className="flex items-center gap-1 text-orange-500 text-xs">
+              <div className="flex gap-0.5">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <span
+                    key={star}
+                    className="material-symbols-outlined"
+                    style={{
+                      fontSize: 14,
+                      fontVariationSettings: `'FILL' ${star <= product.rating ? 1 : 0}`,
+                    }}
+                  >
+                    star
+                  </span>
+                ))}
+              </div>
               <span className="font-technical text-[9px] text-stone-600">
                 ({product.reviewCount})
               </span>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Price */}
           <div className="flex items-baseline gap-2 mt-2">

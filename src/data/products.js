@@ -134,14 +134,14 @@ export async function getFeaturedProducts() {
   return data.map(toProduct);
 }
 
-/** Products where new_arrival = true, ordered by sort_order, limit 3 */
+/** Products where new_arrival = true, ordered by sort_order, limit 6 */
 export async function getNewArrivals() {
   const { data, error } = await supabase
     .from('products')
     .select(CARD_WITH_COLORS_SELECT)
     .eq('new_arrival', true)
     .order('sort_order', { ascending: true })
-    .limit(3);
+    .limit(6);
 
   if (error) {
     console.error('[products] getNewArrivals error:', error.message);

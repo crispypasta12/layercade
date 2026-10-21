@@ -299,7 +299,7 @@ export default function LandingPage() {
           viewport={{ once: true, margin: '-60px' }}
         >
           {loading
-            ? Array.from({ length: 3 }).map((_, i) => (
+            ? Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="aspect-[3/4] bg-[#161616] border border-white/5 animate-pulse" />
               ))
             : newProducts.map((product) => (

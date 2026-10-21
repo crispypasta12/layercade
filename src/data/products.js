@@ -119,13 +119,13 @@ export async function fetchProducts() {
   return data.map(toProduct);
 }
 
-/** Products where featured = true, ordered by sort_order */
+/** Products where featured = true, newest added first */
 export async function getFeaturedProducts() {
   const { data, error } = await supabase
     .from('products')
     .select(CARD_WITH_COLORS_SELECT)
     .eq('featured', true)
-    .order('sort_order', { ascending: true });
+    .order('created_at', { ascending: false });
 
   if (error) {
     console.error('[products] getFeaturedProducts error:', error.message);

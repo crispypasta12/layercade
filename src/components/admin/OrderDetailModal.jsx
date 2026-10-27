@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -65,6 +66,7 @@ export default function OrderDetailModal({ order, onClose, onUpdated, onDeleted 
   const [confirmDelete,  setConfirmDelete]  = useState(false);
   const [deleting,       setDeleting]       = useState(false);
   const [exportingPDF,   setExportingPDF]   = useState(false);
+  const [invoiceNumber,  setInvoiceNumber]  = useState(null);
   const invoiceRef = useRef(null);
 
   /* ── Close on Escape ──────────────────────────────────────────── */
@@ -80,6 +82,21 @@ export default function OrderDetailModal({ order, onClose, onUpdated, onDeleted 
     setAdminNote(order.admin_notes ?? '');
     setConfirmDelete(false);
   }, [order]);
+
+  /* ── Where this order came from ───────────────────────────────── */
+  // Orders raised from the Invoice Maker carry its id; the number is what's
+  // worth showing, so it's fetched rather than duplicated onto every order.
+  useEffect(() => {
+    if (!order.invoice_id) { setInvoiceNumber(null); return; }
+    let live = true;
+    supabase
+      .from('invoices')
+      .select('number')
+      .eq('id', order.invoice_id)
+      .maybeSingle()
+      .then(({ data }) => { if (live) setInvoiceNumber(data?.number ?? null); });
+    return () => { live = false; };
+  }, [order.invoice_id]);
 
   /* ── Update status ────────────────────────────────────────────── */
   const handleStatusUpdate = async () => {
@@ -192,6 +209,11 @@ export default function OrderDetailModal({ order, onClose, onUpdated, onDeleted 
   const items       = Array.isArray(order.items) ? order.items : [];
   const subtotal    = items.reduce((s, i) => s + (i.price ?? 0) * (i.quantity ?? 1), 0);
   const deliveryFee = order.delivery_fee ?? 0;
+  // Invoiced orders carry what each line cost us, so the margin can be shown
+  // here too. Back-office only — nothing customer-facing reads these.
+  const hasCosts    = items.some((i) => Number(i.cost) > 0);
+  const totalCost   = items.reduce((s, i) => s + (Number(i.cost) || 0) * (i.quantity ?? 1), 0);
+  const profit      = subtotal - totalCost;
   const grandTotal  = order.total_amount ?? subtotal + deliveryFee;
 
   const selectClass =
@@ -234,6 +256,17 @@ export default function OrderDetailModal({ order, onClose, onUpdated, onDeleted 
               <p className="font-technical text-xs text-stone-500 uppercase tracking-widest">
                 {formatDate(order.created_at)}
               </p>
+              {order.invoice_id && (
+                <Link
+                  to="/admin/invoices"
+                  className="inline-flex items-center gap-1 px-2 py-0.5 border border-[#ff5500]/30
+                             bg-[#ff5500]/10 text-[#ff5500] font-technical text-[10px]
+                             uppercase tracking-widest hover:bg-[#ff5500]/20 transition-colors"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 12 }}>receipt_long</span>
+                  From {invoiceNumber ?? 'invoice'}
+                </Link>
+              )}
             </div>
             <div className="flex items-center gap-2 ml-4 flex-shrink-0">
               <button
@@ -382,6 +415,12 @@ export default function OrderDetailModal({ order, onClose, onUpdated, onDeleted 
                           <p className="font-technical text-stone-500 text-xs mt-1 uppercase tracking-widest">
                             Qty: {item.quantity ?? 1} &nbsp;·&nbsp;
                             ৳{(item.price ?? 0).toLocaleString('en-IN')} each
+                            {Number(item.cost) > 0 && (
+                              <>
+                                &nbsp;·&nbsp;
+                                <span className="text-stone-600">cost ৳{Number(item.cost).toLocaleString('en-IN')}</span>
+                              </>
+                            )}
                           </p>
                         </div>
 
@@ -408,6 +447,26 @@ export default function OrderDetailModal({ order, onClose, onUpdated, onDeleted 
                     ৳{subtotal.toLocaleString('en-IN')}
                   </span>
                 </div>
+                {hasCosts && (
+                  <>
+                    <div className="flex justify-between font-body text-stone-500 text-sm">
+                      <span>Cost</span>
+                      <span style={{ fontFamily: "'Space Mono', monospace" }}>
+                        ৳{totalCost.toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                    <div className="flex justify-between font-body text-sm">
+                      <span className="text-stone-500">Profit</span>
+                      <span
+                        className={profit < 0 ? 'text-red-400' : 'text-green-400'}
+                        style={{ fontFamily: "'Space Mono', monospace" }}
+                      >
+                        ৳{profit.toLocaleString('en-IN')}
+                        {subtotal > 0 && ` · ${((profit / subtotal) * 100).toFixed(0)}%`}
+                      </span>
+                    </div>
+                  </>
+                )}
                 <div className="flex justify-between font-body text-stone-500 text-sm">
                   <span>Delivery Fee</span>
                   <span style={{ fontFamily: "'Space Mono', monospace" }}>

@@ -404,11 +404,18 @@ export default function AdminOrders() {
                   >
                     {/* Top row: order ID + status */}
                     <div className="flex items-center justify-between gap-2">
-                      <span
-                        className="font-mono text-[#ff5500] text-sm"
-                        style={{ fontFamily: "'Space Mono', monospace" }}
-                      >
-                        #ORD-{order.id}
+                      <span className="flex items-center gap-1.5 min-w-0">
+                        <span
+                          className="font-mono text-[#ff5500] text-sm"
+                          style={{ fontFamily: "'Space Mono', monospace" }}
+                        >
+                          #ORD-{order.id}
+                        </span>
+                        {order.invoice_id && (
+                          <span className="material-symbols-outlined text-stone-600" style={{ fontSize: 13 }} title="Raised from an invoice">
+                            receipt_long
+                          </span>
+                        )}
                       </span>
                       <StatusBadge status={order.status} />
                     </div>
@@ -531,6 +538,12 @@ export default function AdminOrders() {
                         <td className="py-3 px-4 font-mono text-[#ff5500] text-xs whitespace-nowrap"
                             style={{ fontFamily: "'Space Mono', monospace" }}>
                           #ORD-{order.id}
+                          {order.invoice_id && (
+                            <span className="material-symbols-outlined text-stone-600 align-middle ml-1.5"
+                                  style={{ fontSize: 13 }} title="Raised from an invoice">
+                              receipt_long
+                            </span>
+                          )}
                         </td>
                         <td className="py-3 px-4 font-technical text-stone-400 text-xs whitespace-nowrap">
                           {formatDate(order.created_at)}
